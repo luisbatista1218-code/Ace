@@ -89,6 +89,7 @@ let processedCommands = new Set();
 let lastLocalizacaoData = null;
 let cartTimeout;
 
+
 async function carregarEstoque() {
   try {
     const response = await fetch(API_URL);
@@ -149,17 +150,8 @@ async function carregarEstoque() {
     console.error('❌ Erro ao carregar planilha:', error);
   }
   }
-    });
 
-    console.log('✅ Produtos carregados:', products);
-    console.log('✅ Categorias encontradas:', categories);
-    if (currentView === 'categories' || currentView === 'category-products') {
-      showCategories();
-    }
-  } catch (error) {
-    console.error('❌ Erro ao carregar planilha:', error);
-  }
-}
+    
   
 async function salvarEstoque() {
   try {
