@@ -93,20 +93,29 @@ async function carregarEstoque() {
   try {
     const response = await fetch(API_URL);
     const data = await response.json();
-    console.log('📊 Dados da planilha:', data);
+    console.log('📊 Dados BRUTOS da planilha (primeira linha):', data[0]);
 
     products = [];
     categories = [];
     
     data.forEach(linha => {
       const id = Number(linha.id) || 0;
-      const categoria = linha.categoria || 'Sem Categoria';
-      const nome = linha.produto || 'Produto sem nome';
-      // ⚡ CORREÇÃO DO PREÇO:
-      let precoTexto = String(linha.preco || '0').replace('R$', '').replace(',', '.').trim();
-      const preco = parseFloat(precoTexto) || 0;
+      const categoria = linha.categoria || linha.Categoria || 'Sem Categoria';
+      const nome = linha.produto || linha.Produto || 'Produto sem nome';
+      
+      // ⚡ **CORREÇÃO 1: BUSCA PREÇO EM MÚLTIPLAS COLUNAS (com e sem acento)**
+      let precoValor = 0;
+      const precoRaw = linha.preco || linha.preço || linha.Preco || linha.Preço || '0';
+      if (precoRaw && precoRaw !== '') {
+        const precoStr = String(precoRaw).replace('R$', '').replace(',', '.').replace(/\s/g, '').trim();
+        precoValor = parseFloat(precoStr) || 0;
+      }
+      
       const estoque = Number(linha.estoque) || 0;
-      const descricao = linha.descricao || '';
+      
+      // ⚡ **CORREÇÃO 2: BUSCA DESCRIÇÃO EM MÚLTIPLAS COLUNAS (com e sem acento)**
+      const descricao = linha.descricao || linha.descrição || linha.Descricao || linha.Descrição || '';
+      
       const imagem = linha.imagem_url || `https://via.placeholder.com/400x200?text=${encodeURIComponent(nome)}`;
       
       if (id > 0 && nome !== 'Produto sem nome') {
@@ -115,16 +124,31 @@ async function carregarEstoque() {
           categoria: categoria,
           nome: nome,
           descricao: descricao,
-          preco: preco,
+          preco: precoValor,
           estoque: estoque,
           imagem: imagem
         };
         
+        console.log(`✅ Produto ${id}: "${nome}" | Preço: ${precoValor} | Descrição: "${descricao.substring(0, 30)}${descricao.length > 30 ? '...' : ''}"`);
         products.push(produto);
+        
         if (!categories.includes(categoria)) {
           categories.push(categoria);
         }
       }
+    });
+
+    console.log('✅ Total de produtos carregados:', products.length);
+    console.log('✅ Produtos:', products);
+    console.log('✅ Categorias:', categories);
+
+    if (currentView === 'categories' || currentView === 'category-products') {
+      showCategories();
+    }
+  } catch (error) {
+    console.error('❌ Erro ao carregar planilha:', error);
+  }
+  }
     });
 
     console.log('✅ Produtos carregados:', products);
