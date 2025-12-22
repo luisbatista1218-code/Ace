@@ -73,7 +73,7 @@ const STORAGE_KEY = 'delivery_app_data';
 const SESSION_DURATION = 24 * 60 * 60 * 1000;
 const PLANILHA_ID = '1Ih4QIhWBfnV5L12uc0kyBabF7zCk_iKJoXyyjcxlIss';
 const API_URL = `https://opensheet.elk.sh/${PLANILHA_ID}/1`;
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8bCOs0PXTIht6zsYFDJ6bi5LLuSkMUtUMOP82c9b1Mss-5gAPuH2ie4CIu-OtVGFw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx6lTe1jNrAj7u6Vnrz_PGdIUOh9fJ4QZ687UUhjpDoGcgyd8AErfgl9T034SKELBZP/exec';
 
 let cart = [];
 let notifications = [];
@@ -103,15 +103,17 @@ async function carregarEstoque() {
       const nome = linha.produto || linha.Produto || 'Produto sem nome';
       
       let precoValor = 0;
-      const precoRaw = linha.preco || linha.preço || linha.Preco || linha.Preço || '0';
+      const precoRaw = linha.preco || linha.preço || linha['preço '] || linha.Preco || linha.Preço || '0';
       if (precoRaw && precoRaw !== '') {
         const precoStr = String(precoRaw).replace('R$', '').replace(',', '.').replace(/\s/g, '').trim();
         precoValor = parseFloat(precoStr) || 0;
       }
       
       const estoque = Number(linha.estoque) || 0;
-      const descricao = linha.descricao || linha.descrição || linha.Descricao || linha.Descrição || '';
+      const descricao = linha.descricao || linha.descrição || linha['descrição '] || linha.Descricao || linha.Descrição || '';
       const imagem = linha.imagem_url || `https://via.placeholder.com/400x200?text=${encodeURIComponent(nome)}`;
+      const pedido = linha.pedido || '';
+      const status = linha.status || '';
       
       if (id > 0 && nome !== 'Produto sem nome') {
         const produto = {
@@ -121,10 +123,12 @@ async function carregarEstoque() {
           descricao: descricao,
           preco: precoValor,
           estoque: estoque,
-          imagem: imagem
+          imagem: imagem,
+          pedido: pedido,
+          status: status
         };
         
-        console.log(`✅ Produto ${id}: "${nome}" | Preço: ${precoValor} | Descrição: "${descricao.substring(0, 30)}${descricao.length > 30 ? '...' : ''}"`);
+        console.log(`✅ Produto ${id}: "${nome}" | Preço: ${precoValor} | Pedido: ${pedido} | Status: ${status}`);
         products.push(produto);
         
         if (!categories.includes(categoria)) {
@@ -151,10 +155,12 @@ async function salvarEstoque() {
         id: String(p.id),
         categoria: p.categoria || '',
         produto: p.nome || '',
-        preço: String(p.preco || 0),      // ⬅️ ENVIA 'preço' (com acento)
+        preço: String(p.preco || 0),
         estoque: String(p.estoque || 0),
         imagem: p.imagem || '',
-        descrição: p.descricao || ''      // ⬅️ ENVIA 'descrição' (com acento)
+        descrição: p.descricao || '',
+        pedido: p.pedido || '',
+        status: p.status || ''
       }))
     };
 
@@ -189,10 +195,12 @@ async function salvarEstoque() {
           id: String(p.id),
           categoria: p.categoria || '',
           produto: p.nome || '',
-          preço: String(p.preco || 0),      // ⬅️ ENVIA 'preço' (com acento)
+          preço: String(p.preco || 0),
           estoque: String(p.estoque || 0),
           imagem: p.imagem || '',
-          descrição: p.descricao || ''      // ⬅️ ENVIA 'descrição' (com acento)
+          descrição: p.descricao || '',
+          pedido: p.pedido || '',
+          status: p.status || ''
         }))
       }));
       return true;
@@ -278,7 +286,17 @@ async function processarCallbackStatus(data, callbackObj) {
   if (novoStatus === 'entregue' || novoStatus === 'cancelado') {
     pedidosBloqueados.add(chave);
   }
+
+  // 🔄 ATUALIZA STATUS NA PLANILHA
+  const produto = products.find(p => p.pedido && p.pedido.toString() === codigo.toString());
+  if (produto) {
+    produto.status = textoStatus;
+    await salvarEstoque();
+    console.log(`🔄 Status atualizado na planilha para pedido ${codigo}: ${textoStatus}`);
+  }
+
   atualizarStatusPedido(codigo, textoStatus);
+
   if (callbackObj?.id) {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
       method: 'POST',
@@ -865,27 +883,63 @@ function showUploadComprovante(localizacaoData, descricao) {
     const reader = new FileReader();
     reader.onload = async function(e) {
       const comprovanteBase64 = e.target.result;
-      await carregarEstoque();
+
+      // ⚡ **ATUALIZAR PLANILHA COM NÚMERO DO PEDIDO E STATUS**
+      await carregarEstoque(); // Recarrega produtos
+      
+      // Gera número do pedido
+      let codigoPedido = Math.floor(Math.random() * 900 + 100);
+      
+      // Atualiza estoque
       cart.forEach(item => {
         const produto = products.find(p => p.id === item.id);
         if (produto && produto.estoque !== undefined) {
           produto.estoque -= item.qtd;
+          // ⚡ ADICIONA NÚMERO DO PEDIDO E STATUS AO PRODUTO
+          produto.pedido = codigoPedido;
+          produto.status = 'Aguardando pagamento';
           if (produto.estoque <= 0) { alertaEstoqueZerado(produto); }
         }
       });
-      await salvarEstoque();
-      let codigoPedido = Math.floor(Math.random() * 900 + 100);
+      
+      await salvarEstoque(); // Salva com pedido e status
+      
       let totalPedido = cart.reduce((total, item) => total + (item.preco * item.qtd), 0);
+      
       let pedido = {
-        codigo: codigoPedido, produtos: [...cart], total: totalPedido, local: localizacao, mapaUrl: mapaUrl, desc: descricao || '',
-        whatsapp: whatsapp, comprovante: comprovanteBase64, comprovanteNome: selectedFile.name, comprovanteTipo: selectedFile.type,
-        data: new Date().toLocaleString('pt-BR'), status: 'Pedido recebido - Aguardando confirmação do pagamento'
+        codigo: codigoPedido,
+        produtos: [...cart],
+        total: totalPedido,
+        local: localizacao,
+        mapaUrl: mapaUrl,
+        desc: descricao || '',
+        whatsapp: whatsapp,
+        comprovante: comprovanteBase64,
+        comprovanteNome: selectedFile.name,
+        comprovanteTipo: selectedFile.type,
+        data: new Date().toLocaleString('pt-BR'),
+        status: 'Aguardando pagamento'
       };
+      
       orders.push(pedido);
-      notifications.push({ codigo: codigoPedido, msg: `Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`, data: pedido.data, notaFiscal: gerarNotaFiscal(pedido), status: pedido.status });
-      addNotification(); saveToStorage(); await sendTelegramNotification(pedido);
+      notifications.push({ 
+        codigo: codigoPedido, 
+        msg: `Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`, 
+        data: pedido.data, 
+        notaFiscal: gerarNotaFiscal(pedido), 
+        status: pedido.status 
+      });
+      
+      addNotification(); 
+      saveToStorage(); 
+      
+      await sendTelegramNotification(pedido);
+      
       alert(`✅ Pedido #${pedido.codigo} confirmado!\n📱 Notificação enviada para o administrador\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n💎 Use o botão "Nota Fiscal" para baixar seus pedidos!`);
-      cart = []; saveToStorage(); showHome();
+
+      cart = []; 
+      saveToStorage(); 
+      showHome();
     };
     reader.onerror = function() { alert('❌ Erro ao ler o arquivo. Tente novamente.'); };
     reader.readAsDataURL(selectedFile);
