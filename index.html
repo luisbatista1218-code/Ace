@@ -58,7 +58,7 @@
 
 <div class="nav">
   <button onclick="showHome()">Início</button>
-  <button onclick="showCategories()">Categoria</button>
+  <button onclick="showCategory()">Categoria</button> <!-- CORRIGIDO: categoria -->
   <button onclick="showCart()">Carrinho</button>
   <button id="notifBtn" class="notification-btn" onclick="showNotifs()">
     Notificações
@@ -93,6 +93,7 @@ async function carregarEstoque() {
   try {
     const response = await fetch(API_URL);
     const data = await response.json();
+    console.log('📊 Dados BRUTOS da planilha (primeira linha):', data[0]);
 
     products = [];
     categories = [];
@@ -128,6 +129,7 @@ async function carregarEstoque() {
           status: status
         };
         
+        console.log(`✅ Produto ${id}: "${nome}" | Preço: ${precoValor} | Pedido: ${pedido} | Status: ${status}`);
         products.push(produto);
         
         if (!categories.includes(categoria)) {
@@ -136,8 +138,11 @@ async function carregarEstoque() {
       }
     });
 
-    if (currentView === 'categories' || currentView === 'category-products') {
-      showCategories();
+    console.log('✅ Total de produtos carregados:', products.length);
+    console.log('✅ Categorias:', categories);
+
+    if (currentView === 'category' || currentView === 'category-products') {
+      showCategory();
     }
   } catch (error) {
     console.error('❌ Erro ao carregar planilha:', error);
@@ -160,6 +165,7 @@ async function salvarEstoque() {
       }))
     };
 
+    console.log('📤 Enviando para planilha:', dados);
     const proxyUrl = 'https://corsproxy.io/?';
     const urlCompleta = proxyUrl + encodeURIComponent(SCRIPT_URL);
     
@@ -171,7 +177,7 @@ async function salvarEstoque() {
 
     if (response.ok) {
       const result = await response.text();
-      console.log('✅ Produtos salvos na planilha!');
+      console.log('✅ Produtos salvos na planilha!', result);
       return true;
     } else {
       throw new Error('Erro HTTP: ' + response.status);
@@ -280,7 +286,20 @@ async function processarCallbackStatus(data, callbackObj) {
   if (novoStatus === 'entregue' || novoStatus === 'cancelado') {
     pedidosBloqueados.add(chave);
   }
+
+  // Atualiza status na planilha
+  const pedido = orders.find(o => o.codigo === codigo);
+  if (pedido) {
+    // Encontra o produto correspondente na planilha
+    const produtoIndex = products.findIndex(p => p.pedido === String(codigo));
+    if (produtoIndex !== -1) {
+      products[produtoIndex].status = textoStatus;
+      await salvarEstoque();
+    }
+  }
+
   atualizarStatusPedido(codigo, textoStatus);
+  
   if (callbackObj?.id) {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
       method: 'POST',
@@ -292,6 +311,18 @@ async function processarCallbackStatus(data, callbackObj) {
       })
     });
   }
+  
+  // Envia nova mensagem no Telegram
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      chat_id: CHAT_ID,
+      text: `🔄 Pedido #${codigo} atualizado: ${textoStatus}`,
+      parse_mode: 'Markdown'
+    })
+  });
+
   console.log(`Status de ${codigo} atualizado para: ${textoStatus}`);
 }
 
@@ -311,7 +342,10 @@ function atualizarStatusPedido(codigo, novoStatus) {
       addNotification();
     }
     saveToStorage();
-    if (currentView === 'notifs') { showNotifs(); }
+    
+    if (currentView === 'notifs') {
+      showNotifs();
+    }
   }
 }
 
@@ -395,42 +429,13 @@ function addNotification() {
   updateNotificationCounter();
 }
 
-function verificarStatusAutomatico() {
-  if (orders.length === 0) return;
-  
-  orders.forEach(async pedido => {
-    const produto = products.find(p => p.pedido === String(pedido.codigo));
-    if (produto && produto.status && produto.status !== pedido.status) {
-      pedido.status = produto.status;
-      notifications.push({
-        codigo: pedido.codigo,
-        msg: `🔄 Pedido #${pedido.codigo} atualizado: ${produto.status}`,
-        data: new Date().toLocaleString('pt-BR'),
-        notaFiscal: gerarNotaFiscal(pedido),
-        status: produto.status
-      });
-      addNotification();
-      saveToStorage();
-      if (currentView === 'notifs') { showNotifs(); }
-    }
-  });
-}
-
-function iniciarVerificacaoStatus() {
-  if (statusCheckInterval) clearInterval(statusCheckInterval);
-  statusCheckInterval = setInterval(() => {
-    carregarEstoque();
-    verificarStatusAutomatico();
-  }, 3000);
-}
-
 function showHelp(){
   currentView = 'help-main';
   const html = `
     <div class='card'>
       <h3>📚 Central de Ajuda</h3>
       <p>Escolha uma categoria para ver as instruções:</p>
-      <div class='category-item' onclick='showHelpCategory("categorias")'><h4 style='margin:0'>🏷️ Como usar Categorias</h4></div>
+      <div class='category-item' onclick='showHelpCategory("categorias")'><h4 style='margin:0'>🏷️ Como usar Categoria</h4></div>
       <div class='category-item' onclick='showHelpCategory("carrinho")'><h4 style='margin:0'>🛒 Como usar o Carrinho</h4></div>
       <div class='category-item' onclick='showHelpCategory("notificacoes")'><h4 style='margin:0'>📱 Notificações e Pedidos</h4></div>
       <div class='category-item' onclick='showHelpCategory("pagamento")'><h4 style='margin:0'>💳 Processo de Pagamento</h4></div>
@@ -442,7 +447,7 @@ function showHelp(){
 function showHelpCategory(categoria){
   currentView = 'help-category';
   const conteudos = {
-    categorias: { titulo: "🏷️ Como usar Categorias", texto: `1. <strong>Navegação</strong>: Toque em "Categoria" no menu inferior para ver todas as categorias disponíveis.<br><br>2. <strong>Seleção</strong>: Escolha uma categoria como "Pizza", "Bebidas" ou "Sobremesas".<br><br>3. <strong>Produtos</strong>: Dentro de cada categoria, você verá todos os produtos disponíveis com foto, descrição e preço.<br><br>4. <strong>Adicionar</strong>: Toque em "Adicionar ao Carrinho" para incluir o produto no seu pedido.` },
+    categorias: { titulo: "🏷️ Como usar Categoria", texto: `1. <strong>Navegação</strong>: Toque em "Categoria" no menu inferior para ver todas as categorias disponíveis.<br><br>2. <strong>Seleção</strong>: Escolha uma categoria como "Pizza", "Bebidas" ou "Sobremesas".<br><br>3. <strong>Produtos</strong>: Dentro de cada categoria, você verá todos os produtos disponíveis com foto, descrição e preço.<br><br>4. <strong>Adicionar</strong>: Toque em "Adicionar ao Carrinho" para incluir o produto no seu pedido.` },
     carrinho: { titulo: "🛒 Como usar o Carrinho", texto: `1. <strong>Acesso</strong>: Toque em "Carrinho" no menu inferior para ver seus itens.<br><br>2. <strong>Quantidade</strong>: Use os botões "+" e "-" para ajustar as quantidades.<br><br>3. <strong>Remover</strong>: Diminua a quantidade para zero para remover um item.<br><br>4. <strong>Finalizar</strong>: Toque em "Finalizar Pedido" quando estiver pronto para pagar.<br><br>5. <strong>Limpar</strong>: Use "Limpar Carrinho" para remover todos os itens.` },
     notificacoes: { titulo: "📱 Notificações e Pedidos", texto: `1. <strong>Acompanhamento</strong>: Toque em "Notificações" para ver o status dos seus pedidos.<br><br>2. <strong>Status</strong>: Acompanhe cada etapa: recebido, em preparo, saiu para entrega, entregue.<br><br>3. <strong>Nota Fiscal</strong>: Pedidos com pagamento confirmado permitem baixar a nota fiscal.<br><br>4. <strong>Badge</strong>: O número vermelho indica novas notificações não lidas.` },
     pagamento: { titulo: "💳 Processo de Pagamento", texto: `1. <strong>Localização</strong>: O app detecta automaticamente seu endereço via GPS.<br><br>2. <strong>Dados</strong>: Confirme ou edite o endereço e informe seu telefone.<br><br>3. <strong>PIX</strong>: Você receberá a chave PIX e valor exato para pagamento.<br><br>4. <strong>Comprovante</strong>: Envie foto ou PDF do comprovante pelo próprio app.<br><br>5. <strong>Confirmação</strong>: Após análise, seu pedido será confirmado.` },
@@ -470,8 +475,40 @@ async function sendTelegramNotification(pedido) {
     });
     const messageResult = await messageResponse.json();
     if (messageResult.ok && messageResult.result) { messageIds[pedido.codigo] = messageResult.result.message_id; }
+    if (pedido.mapaUrl) { await sendLocalizacaoToTelegram(pedido); }
+    if (pedido.comprovante) { await sendComprovanteToTelegram(pedido); }
     if (!messageResult.ok) { console.error('Erro Telegram:', messageResult); }
   } catch (error) { console.error('Erro ao conectar com Telegram:', error); }
+}
+
+async function sendLocalizacaoToTelegram(pedido) {
+  try {
+    const message = `📍 *LOCALIZAÇÃO DO PEDIDO #${pedido.codigo}*\n\n🗺️ [Abrir no Google Maps](${pedido.mapaUrl})`;
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'Markdown' })
+    });
+  } catch (error) { console.error('Erro ao enviar localização:', error); }
+}
+
+async function sendComprovanteToTelegram(pedido) {
+  try {
+    const base64Data = pedido.comprovante.split(',')[1];
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
+    const blob = new Blob([bytes], { type: pedido.comprovanteTipo });
+    const formData = new FormData();
+    formData.append('chat_id', CHAT_ID);
+    formData.append('document', blob, pedido.comprovanteNome);
+    formData.append('caption', `📎 COMPROVANTE PEDIDO #${pedido.codigo}\n💳 Valor: R$ ${pedido.total.toFixed(2)}`);
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`;
+    const response = await fetch(url, { method: 'POST', body: formData });
+    const result = await response.json();
+    if (!result.ok) { console.error('Erro ao enviar comprovante:', result); }
+  } catch (error) { console.error('Erro ao enviar comprovante para Telegram:', error); }
 }
 
 function gerarNotaFiscal(pedido) {
@@ -499,7 +536,7 @@ function baixarNotaFiscalIndividual(codigo) {
       <div style="margin-bottom: 15px;">
         <p><strong>Pedido:</strong> #${pedido.codigo}</p>
         <p><strong>Data:</strong> ${pedido.data}</p>
-        <p><strong>Status:</strong> ${pedido.status}</p>
+        <p><strong>Status:</strong> Pagamento confirmado</p>
       </div>
       <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
         <thead>
@@ -549,8 +586,8 @@ function goBack(){
     return;
   }
   if(currentView === 'dados-entrega') { showCart(); return; }
-  else if(currentView === 'categories' || currentView === 'category-products' || currentView === 'cart' || currentView === 'notifs'){ showHome(); }
-  else if(currentView === 'product-list'){ showCategories(); }
+  else if(currentView === 'category' || currentView === 'category-products' || currentView === 'cart' || currentView === 'notifs'){ showHome(); }
+  else if(currentView === 'product-list'){ showCategory(); }
 }
 
 function openContact(){ 
@@ -568,8 +605,8 @@ function showHome(){
     </div>`;
 }
 
-function showCategories(){
-  currentView = 'categories';
+function showCategory(){
+  currentView = 'category';
   let html = "<h3>Categorias</h3>";
   if (categories.length === 0) {
     html += '<p>Carregando categorias...</p>';
@@ -603,7 +640,7 @@ function showCategoryProducts(categoryName){
       </div>`;
     });
   }
-  html += `<button class="btn-ghost" onclick="showCategories()" style="margin-top: 15px;">← Voltar para Categorias</button>`;
+  html += `<button class="btn-ghost" onclick="showCategory()" style="margin-top: 15px;">← Voltar para Categorias</button>`;
   document.getElementById('view').innerHTML = html;
 }
 
@@ -645,7 +682,7 @@ function showCart(){
           <button onclick='startCheckout()' class="btn" style="width: 100%; padding: 15px; font-size: 18px;">✅ Finalizar Pedido</button>
         </div>
         <button onclick='clearCart()' class="btn-ghost">Limpar Carrinho</button>
-        <button onclick='showCategories()' class="btn-ghost">← Voltar Categorias</button>
+        <button onclick='showCategory()' class="btn-ghost">← Voltar Categorias</button>
       </div>`;
   }
   document.getElementById('view').innerHTML = html;
@@ -813,19 +850,16 @@ function showUploadComprovante(localizacaoData, descricao) {
       const comprovanteBase64 = e.target.result;
       await carregarEstoque();
       
-      // ATUALIZA PRODUTO COM NÚMERO DO PEDIDO
-      let codigoPedido = Math.floor(Math.random() * 900 + 100);
-      const produto = products.find(p => p.id === cart[0]?.id);
-      if (produto) {
-        produto.pedido = String(codigoPedido);
-        produto.status = 'Aguardando pagamento';
-        await salvarEstoque();
-      }
+      // Atribui número do pedido e status inicial
+      const codigoPedido = Math.floor(Math.random() * 900 + 100);
       
       cart.forEach(item => {
         const produto = products.find(p => p.id === item.id);
         if (produto && produto.estoque !== undefined) {
           produto.estoque -= item.qtd;
+          produto.pedido = String(codigoPedido);
+          produto.status = 'Aguardando pagamento';
+          
           if (produto.estoque <= 0) { alertaEstoqueZerado(produto); }
         }
       });
@@ -849,10 +883,23 @@ function showUploadComprovante(localizacaoData, descricao) {
       };
       
       orders.push(pedido);
-      notifications.push({ codigo: codigoPedido, msg: `Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`, data: pedido.data, notaFiscal: gerarNotaFiscal(pedido), status: pedido.status });
-      addNotification(); saveToStorage(); await sendTelegramNotification(pedido);
+      notifications.push({ 
+        codigo: codigoPedido, 
+        msg: `Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`, 
+        data: pedido.data, 
+        notaFiscal: gerarNotaFiscal(pedido), 
+        status: pedido.status 
+      });
+      
+      addNotification(); 
+      saveToStorage(); 
+      await sendTelegramNotification(pedido);
+      
       alert(`✅ Pedido #${pedido.codigo} confirmado!\n📱 Notificação enviada para o administrador\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n💎 Use o botão "Nota Fiscal" para baixar seus pedidos!`);
-      cart = []; saveToStorage(); showHome();
+
+      cart = []; 
+      saveToStorage(); 
+      showHome();
     };
     reader.onerror = function() { alert('❌ Erro ao ler o arquivo. Tente novamente.'); };
     reader.readAsDataURL(selectedFile);
@@ -864,7 +911,7 @@ function showNotifs(){
   unreadNotifications = 0;
   updateNotificationCounter();
   saveToStorage();
-  let html = '<h3>Notificações dos Pedidos</h3>';
+  let html = '<h3>Notificações dos Pedidos <button class="btn" onclick="verificarStatusPedidos()" style="margin-left:10px;">🔄 Verificar Status</button></h3>';
   if(notifications.length === 0){ 
     html += '<p>Nenhuma notificação.</p>';
   } else {
@@ -881,8 +928,51 @@ function showNotifs(){
   document.getElementById('view').innerHTML = html;
 }
 
+// ⚡ NOVA FUNÇÃO: Verifica status na planilha a cada 3 segundos
+async function verificarStatusPedidos() {
+  console.log('🔄 Verificando status na planilha...');
+  await carregarEstoque();
+  
+  let atualizou = false;
+  
+  // Verifica cada pedido local
+  orders.forEach(pedidoLocal => {
+    // Procura produto com mesmo número de pedido na planilha
+    const produtoPlanilha = products.find(p => p.pedido === String(pedidoLocal.codigo));
+    
+    if (produtoPlanilha && produtoPlanilha.status && pedidoLocal.status !== produtoPlanilha.status) {
+      // Status mudou na planilha!
+      pedidoLocal.status = produtoPlanilha.status;
+      
+      // Atualiza notificação
+      const notif = notifications.find(n => n.codigo === pedidoLocal.codigo);
+      if (notif) {
+        notif.msg = `Pedido #${pedidoLocal.codigo} - R$ ${pedidoLocal.total.toFixed(2)} - Status: ${produtoPlanilha.status}`;
+        notif.status = produtoPlanilha.status;
+      }
+      
+      atualizou = true;
+      console.log(`✅ Pedido #${pedidoLocal.codigo} atualizado: ${produtoPlanilha.status}`);
+    }
+  });
+  
+  if (atualizou) {
+    saveToStorage();
+    if (currentView === 'notifs') {
+      showNotifs();
+    }
+    alert('✅ Status dos pedidos atualizado da planilha!');
+  }
+}
+
+// Inicia verificação automática a cada 3 segundos
+function iniciarVerificacaoStatus() {
+  if (statusCheckInterval) clearInterval(statusCheckInterval);
+  statusCheckInterval = setInterval(verificarStatusPedidos, 3000);
+}
+
 window.showHome = showHome;
-window.showCategories = showCategories;
+window.showCategory = showCategory;
 window.showCategoryProducts = showCategoryProducts;
 window.showCart = showCart;
 window.showNotifs = showNotifs;
@@ -896,12 +986,13 @@ window.goBack = goBack;
 window.showHelp = showHelp;
 window.showHelpCategory = showHelpCategory;
 window.baixarNotaFiscalIndividual = baixarNotaFiscalIndividual;
+window.verificarStatusPedidos = verificarStatusPedidos;
 
 async function inicializar() {
   await carregarEstoque();
   loadFromStorage();
   showHome();
-  iniciarVerificacaoStatus();
+  iniciarVerificacaoStatus(); // ⚡ Inicia verificação automática
 }
 
 inicializar();
