@@ -72,7 +72,7 @@ const CHAT_ID = '1232955171';
 const STORAGE_KEY = 'delivery_app_data';
 const SESSION_DURATION = 24 * 60 * 60 * 1000;
 const PLANILHA_ID = '1Ih4QIhWBfnV5L12uc0kyBabF7zCk_iKJoXyyjcxlIss';
-const API_URL = `https://opensheet.elk.sh/${PLANILHA_ID}/1`;
+const API_URL = `https://opensheet.elk.sh/${PLANILHA_ID}/1?t=${Date.now()}`;
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx6lTe1jNrAj7u6Vnrz_PGdIUOh9fJ4QZ687UUhjpDoGcgyd8AErfgl9T034SKELBZP/exec';
 
 let cart = [];
@@ -87,6 +87,7 @@ let messageIds = {};
 let processedCommands = new Set();
 let lastLocalizacaoData = null;
 let cartTimeout;
+let statusCheckInterval = null;
 
 async function carregarEstoque() {
   try {
@@ -128,7 +129,7 @@ async function carregarEstoque() {
           status: status
         };
         
-        console.log(`✅ Produto ${id}: "${nome}" | Preço: ${precoValor} | Pedido: ${pedido} | Status: ${status}`);
+        console.log(`✅ Produto ${id}: "${nome}" | Preço: ${precoValor} | Status: ${status}`);
         products.push(produto);
         
         if (!categories.includes(categoria)) {
@@ -286,17 +287,7 @@ async function processarCallbackStatus(data, callbackObj) {
   if (novoStatus === 'entregue' || novoStatus === 'cancelado') {
     pedidosBloqueados.add(chave);
   }
-
-  // 🔄 ATUALIZA STATUS NA PLANILHA
-  const produto = products.find(p => p.pedido && p.pedido.toString() === codigo.toString());
-  if (produto) {
-    produto.status = textoStatus;
-    await salvarEstoque();
-    console.log(`🔄 Status atualizado na planilha para pedido ${codigo}: ${textoStatus}`);
-  }
-
   atualizarStatusPedido(codigo, textoStatus);
-
   if (callbackObj?.id) {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
       method: 'POST',
@@ -883,63 +874,27 @@ function showUploadComprovante(localizacaoData, descricao) {
     const reader = new FileReader();
     reader.onload = async function(e) {
       const comprovanteBase64 = e.target.result;
-
-      // ⚡ **ATUALIZAR PLANILHA COM NÚMERO DO PEDIDO E STATUS**
-      await carregarEstoque(); // Recarrega produtos
-      
-      // Gera número do pedido
-      let codigoPedido = Math.floor(Math.random() * 900 + 100);
-      
-      // Atualiza estoque
+      await carregarEstoque();
       cart.forEach(item => {
         const produto = products.find(p => p.id === item.id);
         if (produto && produto.estoque !== undefined) {
           produto.estoque -= item.qtd;
-          // ⚡ ADICIONA NÚMERO DO PEDIDO E STATUS AO PRODUTO
-          produto.pedido = codigoPedido;
-          produto.status = 'Aguardando pagamento';
           if (produto.estoque <= 0) { alertaEstoqueZerado(produto); }
         }
       });
-      
-      await salvarEstoque(); // Salva com pedido e status
-      
+      await salvarEstoque();
+      let codigoPedido = Math.floor(Math.random() * 900 + 100);
       let totalPedido = cart.reduce((total, item) => total + (item.preco * item.qtd), 0);
-      
       let pedido = {
-        codigo: codigoPedido,
-        produtos: [...cart],
-        total: totalPedido,
-        local: localizacao,
-        mapaUrl: mapaUrl,
-        desc: descricao || '',
-        whatsapp: whatsapp,
-        comprovante: comprovanteBase64,
-        comprovanteNome: selectedFile.name,
-        comprovanteTipo: selectedFile.type,
-        data: new Date().toLocaleString('pt-BR'),
-        status: 'Aguardando pagamento'
+        codigo: codigoPedido, produtos: [...cart], total: totalPedido, local: localizacao, mapaUrl: mapaUrl, desc: descricao || '',
+        whatsapp: whatsapp, comprovante: comprovanteBase64, comprovanteNome: selectedFile.name, comprovanteTipo: selectedFile.type,
+        data: new Date().toLocaleString('pt-BR'), status: 'Pedido recebido - Aguardando confirmação do pagamento'
       };
-      
       orders.push(pedido);
-      notifications.push({ 
-        codigo: codigoPedido, 
-        msg: `Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`, 
-        data: pedido.data, 
-        notaFiscal: gerarNotaFiscal(pedido), 
-        status: pedido.status 
-      });
-      
-      addNotification(); 
-      saveToStorage(); 
-      
-      await sendTelegramNotification(pedido);
-      
+      notifications.push({ codigo: codigoPedido, msg: `Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`, data: pedido.data, notaFiscal: gerarNotaFiscal(pedido), status: pedido.status });
+      addNotification(); saveToStorage(); await sendTelegramNotification(pedido);
       alert(`✅ Pedido #${pedido.codigo} confirmado!\n📱 Notificação enviada para o administrador\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n💎 Use o botão "Nota Fiscal" para baixar seus pedidos!`);
-
-      cart = []; 
-      saveToStorage(); 
-      showHome();
+      cart = []; saveToStorage(); showHome();
     };
     reader.onerror = function() { alert('❌ Erro ao ler o arquivo. Tente novamente.'); };
     reader.readAsDataURL(selectedFile);
@@ -951,7 +906,7 @@ function showNotifs(){
   unreadNotifications = 0;
   updateNotificationCounter();
   saveToStorage();
-  let html = '<h3>Notificações dos Pedidos</h3>';
+  let html = '<h3>Notificações dos Pedidos <button class="btn" onclick="verificarStatusAutomatico()" style="margin-left:10px;">🔄 Verificar Status</button></h3>';
   if(notifications.length === 0){ 
     html += '<p>Nenhuma notificação.</p>';
   } else {
@@ -966,6 +921,43 @@ function showNotifs(){
     });
   }
   document.getElementById('view').innerHTML = html;
+}
+
+async function verificarStatusAutomatico() {
+  console.log('🔄 Verificando status dos pedidos...');
+  await carregarEstoque();
+  
+  let atualizacoes = 0;
+  orders.forEach(pedido => {
+    const produto = products.find(p => p.pedido == pedido.codigo);
+    if (produto && produto.status && produto.status !== pedido.status) {
+      pedido.status = produto.status;
+      notifications.push({
+        codigo: pedido.codigo,
+        msg: `🔄 Status atualizado: ${produto.status}`,
+        data: new Date().toLocaleString('pt-BR'),
+        status: produto.status
+      });
+      atualizacoes++;
+    }
+  });
+  
+  if (atualizacoes > 0) {
+    saveToStorage();
+    showNotifs();
+    alert(`✅ ${atualizacoes} pedido(s) atualizado(s)!`);
+  } else {
+    alert('📭 Nenhuma atualização encontrada.');
+  }
+}
+
+function iniciarVerificacaoAutomatica() {
+  if (statusCheckInterval) clearInterval(statusCheckInterval);
+  statusCheckInterval = setInterval(() => {
+    if (currentView === 'notifs') {
+      verificarStatusAutomatico();
+    }
+  }, 300000);
 }
 
 window.showHome = showHome;
@@ -983,11 +975,13 @@ window.goBack = goBack;
 window.showHelp = showHelp;
 window.showHelpCategory = showHelpCategory;
 window.baixarNotaFiscalIndividual = baixarNotaFiscalIndividual;
+window.verificarStatusAutomatico = verificarStatusAutomatico;
 
 async function inicializar() {
   await carregarEstoque();
   loadFromStorage();
   showHome();
+  iniciarVerificacaoAutomatica();
 }
 
 inicializar();
