@@ -89,32 +89,114 @@ let processedCommands = new Set();
 let lastLocalizacaoData = null;
 let cartTimeout;
 
+
+        
 async function carregarEstoque() {
   try {
+    console.log('📡 Buscando dados da planilha... URL:', API_URL);
     const response = await fetch(API_URL + '?t=' + Date.now());
+    
+    if (!response.ok) {
+      throw new Error(`Erro HTTP: ${response.status}`);
+    }
+    
     const data = await response.json();
-    console.log('📊 Dados da planilha:', data[0]);
-
+    console.log('📊 Dados recebidos (primeiros 2 registros):', data.slice(0, 2));
+    
+    // Resetar arrays
     products = [];
     categories = [];
     
-    data.forEach(linha => {
-      const id = Number(linha.id) || 0;
-      const categoria = linha.categoria || 'Sem Categoria';
-      const nome = linha.produto || 'Produto sem nome';
+    if (!data || data.length === 0) {
+      console.error('❌ Planilha vazia ou sem dados!');
+      document.getElementById('view').innerHTML = '<p>❌ Erro: Planilha vazia</p>';
+      return;
+    }
+    
+    // Debug: mostrar estrutura da primeira linha
+    const primeiraLinha = data[0];
+    console.log('📋 Colunas disponíveis na planilha:', Object.keys(primeiraLinha));
+    
+    data.forEach((linha, index) => {
+      // Debug: linha completa
+      console.log(`📝 Linha ${index}:`, linha);
       
+      // **CORREÇÃO CRÍTICA:** Buscar os valores pelos nomes CORRETOS das colunas
+      const id = Number(
+        linha.id || 
+        linha.ID || 
+        linha.Id || 
+        linha['ID'] ||  // Tentar com aspas
+        0
+      );
+      
+      const categoria = 
+        linha.categoria || 
+        linha.Categoria || 
+        linha['Categoria'] || 
+        linha['categoria '] ||  // Com espaço
+        'Sem Categoria';
+      
+      const nome = 
+        linha.produto || 
+        linha.Produto || 
+        linha['Produto'] || 
+        linha.nome || 
+        'Produto sem nome';
+      
+      // Processar preço
       let precoValor = 0;
-      const precoRaw = linha.preco || linha.preço || '0';
-      if (precoRaw && precoRaw !== '') {
-        const precoStr = String(precoRaw).replace('R$', '').replace(',', '.').replace(/\s/g, '').trim();
+      const precoRaw = 
+        linha.preco || 
+        linha.Preço || 
+        linha.preço || 
+        linha['Preço'] || 
+        linha.valor || 
+        '0';
+      
+      if (precoRaw && precoRaw !== '' && precoRaw !== '0') {
+        const precoStr = String(precoRaw)
+          .replace('R$', '')
+          .replace(',', '.')
+          .replace(/\s/g, '')
+          .trim();
         precoValor = parseFloat(precoStr) || 0;
+        
+        if (isNaN(precoValor)) {
+          console.warn(`⚠️ Preço inválido na linha ${index}: "${precoRaw}"`);
+          precoValor = 0;
+        }
       }
       
-      const estoque = Number(linha.estoque) || 0;
-      const descricao = linha.descricao || linha.descrição || '';
-      const imagem = linha.imagem_url || `https://via.placeholder.com/400x200?text=${encodeURIComponent(nome)}`;
+      const estoque = Number(
+        linha.estoque || 
+        linha.Estoque || 
+        linha['Estoque'] || 
+        linha.quantidade || 
+        0
+      );
       
-      if (id > 0 && nome !== 'Produto sem nome') {
+      const descricao = 
+        linha.descricao || 
+        linha.descrição || 
+        linha.Descrição || 
+        linha['Descrição'] || 
+        '';
+      
+      const imagem = 
+        linha.imagem || 
+        linha.Imagem_url || 
+        linha.imagem_url || 
+        linha['Imagem_url'] || 
+        linha.Imagem || 
+        `https://via.placeholder.com/400x200?text=${encodeURIComponent(nome)}`;
+      
+      // **ADICIONAR: Pedido e Status (agora existem na planilha)**
+      const pedido = linha.pedido || linha.Pedido || linha['Pedido'] || '';
+      const status = linha.status || linha.Status || linha['Status'] || '';
+      
+      // Filtrar produtos válidos
+      if (id > 0 && nome && nome !== 'Produto sem nome') {
         const produto = {
           id: id,
           categoria: categoria,
@@ -122,25 +204,45 @@ async function carregarEstoque() {
           descricao: descricao,
           preco: precoValor,
           estoque: estoque,
-          imagem: imagem
+          imagem: imagem,
+          pedido: pedido,      // Novo campo
+          status: status       // Novo campo
         };
         
         products.push(produto);
         
-        if (!categories.includes(categoria)) {
+        // Adicionar categoria à lista (evitar duplicatas)
+        if (categoria && categoria !== 'Sem Categoria' && !categories.includes(categoria)) {
           categories.push(categoria);
         }
+        
+        console.log(`✅ Produto ${index}: ${nome} (${categoria}) - R$ ${precoValor}`);
+      } else {
+        console.warn(`⚠️ Linha ${index} ignorada: ID=${id}, Nome="${nome}"`);
       }
     });
 
-    console.log('✅ Produtos carregados:', products.length);
-    console.log('✅ Categorias:', categories);
-
+    console.log('🎉 Carregamento concluído!');
+    console.log('📦 Total de produtos:', products.length);
+    console.log('🏷️ Categorias encontradas:', categories);
+    
+    // Atualizar interface se estiver na tela de categorias
     if (currentView === 'categories' || currentView === 'category-products') {
       showCategories();
     }
+    
   } catch (error) {
     console.error('❌ Erro ao carregar planilha:', error);
+    
+    // Mostrar erro para o usuário
+    if (currentView === 'categories') {
+      document.getElementById('view').innerHTML = `
+        <div class="card">
+          <h3>❌ Erro ao carregar categorias</h3>
+          <p>Erro: ${error.message}</p>
+          <button class="btn" onclick="carregarEstoque()">🔄 Tentar Novamente</button>
+        </div>`;
+    }
   }
 }
   
