@@ -72,7 +72,7 @@ const CHAT_ID = '1232955171';
 const STORAGE_KEY = 'delivery_app_data';
 const SESSION_DURATION = 24 * 60 * 60 * 1000;
 const PLANILHA_ID = '1Ih4QIhWBfnV5L12uc0kyBabF7zCk_iKJoXyyjcxlIss';
-const API_URL = `https://opensheet.elk.sh/${PLANILHA_ID}/1?t=${Date.now()}`;
+const API_URL = `https://opensheet.elk.sh/${PLANILHA_ID}/1`;
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx6lTe1jNrAj7u6Vnrz_PGdIUOh9fJ4QZ687UUhjpDoGcgyd8AErfgl9T034SKELBZP/exec';
 
 let cart = [];
@@ -87,32 +87,32 @@ let messageIds = {};
 let processedCommands = new Set();
 let lastLocalizacaoData = null;
 let cartTimeout;
-let statusCheckInterval = null;
-let carregamentoEmAndamento = false;
 
 async function carregarEstoque() {
-  if (carregamentoEmAndamento) return;
-  
   try {
-    carregamentoEmAndamento = true;
-    
-    // Timeout de 10 segundos máximo
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-    
-    const response = await fetch(API_URL, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    
+    console.log('🔍 Carregando dados da planilha...');
+    const response = await fetch(API_URL);
     const data = await response.json();
-    console.log('📊 Dados BRUTOS da planilha (primeira linha):', data[0]);
+    
+    console.log('📊 Primeira linha da planilha:', data[0]);
+    console.log('📊 Colunas disponíveis:', Object.keys(data[0]));
 
     products = [];
     categories = [];
     
     data.forEach(linha => {
+      console.log('🔍 Processando linha:', linha);
+      
       const id = Number(linha.id) || 0;
-      const categoria = linha.categoria || linha.Categoria || 'Sem Categoria';
-      const nome = linha.produto || linha.Produto || 'Produto sem nome';
+      
+      // TENTA TODAS AS POSSIBILIDADES para categoria
+      const categoria = linha.categoria || linha.Categoria || linha['Categoria '] || 
+                       linha['categoria '] || linha['CATEGORIA'] || linha.CATEGORIA || 'Sem Categoria';
+      
+      console.log('🔍 Categoria encontrada:', categoria);
+      
+      const nome = linha.produto || linha.Produto || linha['Produto '] || 
+                  linha['produto '] || linha.PRODUTO || 'Produto sem nome';
       
       let precoValor = 0;
       const precoRaw = linha.preco || linha.preço || linha['preço '] || linha.Preco || linha.Preço || '0';
@@ -140,43 +140,40 @@ async function carregarEstoque() {
           status: status
         };
         
-        console.log(`✅ Produto ${id}: "${nome}" | Preço: ${precoValor} | Status: ${status}`);
+        console.log(`✅ Produto ${id}: "${nome}" | Categoria: "${categoria}"`);
         products.push(produto);
         
-        if (!categories.includes(categoria)) {
+        // Adiciona categoria SE NÃO ESTIVER VAZIA
+        if (categoria && categoria.trim() !== '' && categoria !== 'Sem Categoria' && !categories.includes(categoria)) {
           categories.push(categoria);
         }
       }
     });
 
     console.log('✅ Total de produtos carregados:', products.length);
-    console.log('✅ Categorias:', categories);
+    console.log('✅ Categorias encontradas:', categories);
+    console.log('✅ Quantidade de categorias:', categories.length);
 
-    // Atualiza status dos pedidos baseado na planilha
-    atualizarStatusPedidosDaPlanilha();
-    
-    if (currentView === 'categories' || currentView === 'category-products') {
-      showCategories();
-    }
+    // ATUALIZA STATUS DOS PEDIDOS baseado na planilha
+    atualizarStatusDaPlanilha();
+
   } catch (error) {
     console.error('❌ Erro ao carregar planilha:', error);
-  } finally {
-    carregamentoEmAndamento = false;
   }
 }
 
-function atualizarStatusPedidosDaPlanilha() {
-  // Procura produtos com pedido e status na planilha
+function atualizarStatusDaPlanilha() {
+  console.log('🔄 Atualizando status dos pedidos da planilha...');
+  
   products.forEach(produto => {
     if (produto.pedido && produto.status) {
       const codigoPedido = parseInt(produto.pedido);
       const pedido = orders.find(o => o.codigo === codigoPedido);
       
       if (pedido && pedido.status !== produto.status) {
-        // Atualiza status do pedido
+        console.log(`📋 Atualizando pedido #${codigoPedido}: ${pedido.status} -> ${produto.status}`);
         pedido.status = produto.status;
         
-        // Adiciona notificação se não existir
         const notificacaoExistente = notifications.find(n => 
           n.codigo === codigoPedido && n.status === produto.status
         );
@@ -186,13 +183,10 @@ function atualizarStatusPedidosDaPlanilha() {
             codigo: codigoPedido,
             msg: `🔄 Pedido #${codigoPedido} atualizado: ${produto.status}`,
             data: new Date().toLocaleString('pt-BR'),
-            notaFiscal: gerarNotaFiscal(pedido),
             status: produto.status
           });
           addNotification();
         }
-        
-        console.log(`📋 Status atualizado do pedido #${codigoPedido}: ${produto.status}`);
       }
     }
   });
@@ -214,16 +208,14 @@ async function salvarEstoque() {
         estoque: String(p.estoque || 0),
         imagem: p.imagem || '',
         descrição: p.descricao || '',
-        pedido: p.pedido || '',      // ⬅️ NOVA COLUNA
-        status: p.status || ''       // ⬅️ NOVA COLUNA
+        pedido: p.pedido || '',
+        status: p.status || ''
       }))
     };
 
-    console.log('📤 Enviando para planilha:', dados);
-    const proxyUrl = 'https://corsproxy.io/?';
-    const urlCompleta = proxyUrl + encodeURIComponent(SCRIPT_URL);
+    console.log('📤 Enviando para planilha:', dados.produtos.length, 'produtos');
     
-    const response = await fetch(urlCompleta, {
+    const response = await fetch(SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dados)
@@ -231,7 +223,7 @@ async function salvarEstoque() {
 
     if (response.ok) {
       const result = await response.text();
-      console.log('✅ Produtos salvos na planilha!', result);
+      console.log('✅ Produtos salvos na planilha!');
       return true;
     } else {
       throw new Error('Erro HTTP: ' + response.status);
@@ -239,30 +231,7 @@ async function salvarEstoque() {
 
   } catch (err) {
     console.error("❌ Erro ao salvar:", err);
-    try {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', SCRIPT_URL, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.timeout = 5000;
-      xhr.onload = function() { console.log('✅ Produtos salvos (fallback)!'); };
-      xhr.send(JSON.stringify({
-        produtos: products.map(p => ({
-          id: String(p.id),
-          categoria: p.categoria || '',
-          produto: p.nome || '',
-          preço: String(p.preco || 0),
-          estoque: String(p.estoque || 0),
-          imagem: p.imagem || '',
-          descrição: p.descricao || '',
-          pedido: p.pedido || '',    // ⬅️ NOVA COLUNA
-          status: p.status || ''     // ⬅️ NOVA COLUNA
-        }))
-      }));
-      return true;
-    } catch (fallbackErr) {
-      console.error("❌ Fallback falhou:", fallbackErr);
-      return false;
-    }
+    return false;
   }
 }
 
@@ -289,14 +258,6 @@ async function checkTelegramUpdates() {
           const text = update.message.text;
           if (text.startsWith('/repor')) { processarReporEstoque(update.message); }
           if (text.startsWith('/list')) { processarListEstoque(update.message); }
-        }  
-        if (update.callback_query) {
-          const data = update.callback_query.data;
-          const commandId = `${update.update_id}_${data}`;
-          if (data.startsWith('status_') && !processedCommands.has(commandId)) {
-            processedCommands.add(commandId);
-            processarCallbackStatus(data, update.callback_query);
-          }
         }
         lastUpdateId = update.update_id;
       });
@@ -304,113 +265,6 @@ async function checkTelegramUpdates() {
   } catch (error) {
     console.error('Erro ao verificar atualizações:', error);
   }
-}
-
-const pedidosBloqueados = new Set();
-
-async function processarCallbackStatus(data, callbackObj) {
-  const match = data.match(/status_(\d+)_(\w+)/);
-  if (!match) return;
-  const codigo = parseInt(match[1]);
-  const novoStatus = match[2].toLowerCase();
-  const chave = `pedido_${codigo}`;
-  if (pedidosBloqueados.has(chave)) {
-    if (callbackObj?.id) {
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          callback_query_id: callbackObj.id,
-          text: 'Este pedido já foi concluído.',
-          show_alert: false
-        })
-      });
-    }
-    console.log(`Ignorado: ${chave} já bloqueado`);
-    return;
-  }
-  const statusMap = {
-    'pago': '✅ Pagamento confirmado',
-    'preparando': '👨‍🍳 Preparando pedido',
-    'entrega': '🚚 Saiu para entrega',
-    'entregue': '🎉 Pedido entregue',
-    'cancelado': '❌ Pedido cancelado'
-  };
-  const textoStatus = statusMap[novoStatus];
-  if (!textoStatus) return;
-  if (novoStatus === 'entregue' || novoStatus === 'cancelado') {
-    pedidosBloqueados.add(chave);
-  }
-  atualizarStatusPedido(codigo, textoStatus);
-  if (callbackObj?.id) {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        callback_query_id: callbackObj.id,
-        text: `Status atualizado: ${textoStatus}`,
-        show_alert: false
-      })
-    });
-  }
-  console.log(`Status de ${codigo} atualizado para: ${textoStatus}`);
-}
-
-function atualizarStatusPedido(codigo, novoStatus) {
-  const pedido = orders.find(o => o.codigo === codigo);
-  if (pedido && pedido.status !== novoStatus) {
-    pedido.status = novoStatus;
-    const notificacaoExistente = notifications.find(n => n.codigo === codigo && n.status === novoStatus);
-    if (!notificacaoExistente) {
-      notifications.push({
-        codigo: codigo,
-        msg: `🔄 Pedido #${codigo} atualizado: ${novoStatus}`,
-        data: new Date().toLocaleString('pt-BR'),
-        notaFiscal: gerarNotaFiscal(pedido),
-        status: novoStatus
-      });
-      addNotification();
-    }
-    saveToStorage();
-    if (messageIds[codigo]) { atualizarMensagemTelegram(codigo, pedido); }
-    if (currentView === 'notifs') { showNotifs(); }
-  }
-}
-
-async function atualizarMensagemTelegram(codigo, pedido) {
-  const inlineKeyboard = {
-    inline_keyboard: [
-      [ { text: "✅ Pago", callback_data: `status_${codigo}_pago` }, { text: "👨‍🍳 Preparando", callback_data: `status_${codigo}_preparando` } ],
-      [ { text: "🚚 Entrega", callback_data: `status_${codigo}_entrega` }, { text: "🎉 Entregue", callback_data: `status_${codigo}_entregue` } ],
-      [ { text: "❌ Cancelar", callback_data: `status_${codigo}_cancelado` } ]
-    ]
-  };
-  const message = `📦 *PEDIDO #${pedido.codigo}* - ${pedido.status}\n\n💰 *Total:* R$ ${pedido.total.toFixed(2)}\n📍 *Endereço:* ${pedido.local}\n📱 *Telefone:* ${pedido.whatsapp}\n📋 *Itens:* ${pedido.produtos.map(p => `${p.nome} (x${p.qtd})`).join(', ')}\n⏰ *Data:* ${pedido.data}`;
-  try {
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: CHAT_ID,
-        message_id: messageIds[codigo],
-        text: message,
-        parse_mode: 'Markdown',
-        reply_markup: inlineKeyboard
-      })
-    });
-    const result = await response.json();
-    if (!result.ok) { console.error('Erro ao atualizar mensagem:', result); }
-  } catch (error) { console.error('Erro ao atualizar mensagem:', error); }
-}
-
-async function alertaEstoqueZerado(produto) {
-  const mensagem = `🚨 *ESTOQUE ZERADO!*\n\n📦 ${produto.nome} está ESGOTADO!\n`;
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ chat_id: CHAT_ID, text: mensagem, parse_mode: 'Markdown' })
-  });
 }
 
 async function processarListEstoque(message) {
@@ -448,7 +302,7 @@ async function processarReporEstoque(message) {
   }
 }
 
-setInterval(checkTelegramUpdates, 2000);
+setInterval(checkTelegramUpdates, 5000);
 
 function loadFromStorage() {
   try {
@@ -554,41 +408,11 @@ async function sendTelegramNotification(pedido) {
       body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'Markdown', reply_markup: inlineKeyboard })
     });
     const messageResult = await messageResponse.json();
-    if (messageResult.ok && messageResult.result) { messageIds[pedido.codigo] = messageResult.result.message_id; }
-    if (pedido.mapaUrl) { await sendLocalizacaoToTelegram(pedido); }
-    if (pedido.comprovante) { await sendComprovanteToTelegram(pedido); }
+    if (messageResult.ok && messageResult.result) { 
+      messageIds[pedido.codigo] = messageResult.result.message_id; 
+    }
     if (!messageResult.ok) { console.error('Erro Telegram:', messageResult); }
   } catch (error) { console.error('Erro ao conectar com Telegram:', error); }
-}
-
-async function sendLocalizacaoToTelegram(pedido) {
-  try {
-    const message = `📍 *LOCALIZAÇÃO DO PEDIDO #${pedido.codigo}*\n\n🗺️ [Abrir no Google Maps](${pedido.mapaUrl})`;
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'Markdown' })
-    });
-  } catch (error) { console.error('Erro ao enviar localização:', error); }
-}
-
-async function sendComprovanteToTelegram(pedido) {
-  try {
-    const base64Data = pedido.comprovante.split(',')[1];
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
-    const blob = new Blob([bytes], { type: pedido.comprovanteTipo });
-    const formData = new FormData();
-    formData.append('chat_id', CHAT_ID);
-    formData.append('document', blob, pedido.comprovanteNome);
-    formData.append('caption', `📎 COMPROVANTE PEDIDO #${pedido.codigo}\n💳 Valor: R$ ${pedido.total.toFixed(2)}`);
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`;
-    const response = await fetch(url, { method: 'POST', body: formData });
-    const result = await response.json();
-    if (!result.ok) { console.error('Erro ao enviar comprovante:', result); }
-  } catch (error) { console.error('Erro ao enviar comprovante para Telegram:', error); }
 }
 
 function gerarNotaFiscal(pedido) {
@@ -598,8 +422,7 @@ function gerarNotaFiscal(pedido) {
     cliente: { telefone: pedido.whatsapp, endereco: pedido.local },
     itens: pedido.produtos.map(item => ({ nome: item.nome, quantidade: item.qtd, preco_unitario: item.preco, subtotal: item.preco * item.qtd })),
     totais: { subtotal: pedido.produtos.reduce((sum, item) => sum + (item.preco * item.qtd), 0), total: pedido.total },
-    status: pedido.status || "Pagamento confirmado",
-    comprovante: pedido.comprovante ? "Enviado" : "Não enviado"
+    status: pedido.status || "Pagamento confirmado"
   };
 }
 
@@ -687,20 +510,42 @@ function showHome(){
 
 function showCategories(){
   currentView = 'categories';
+  console.log('🔍 Mostrando categorias. Array categories:', categories);
+  console.log('🔍 Tamanho do array:', categories.length);
+  
   let html = "<h3>Categorias</h3>";
+  
   if (categories.length === 0) {
-    html += '<p>Carregando categorias...</p>';
-    // Tenta carregar se estiver vazio
-    if (!carregamentoEmAndamento) {
-      carregarEstoque();
-    }
+    console.log('⚠️ Nenhuma categoria encontrada! Tentando carregar...');
+    html += '<div style="background:#fff3cd;padding:15px;border-radius:8px;color:#856404;">';
+    html += '<p>⏳ Nenhuma categoria carregada ainda.</p>';
+    html += '<button class="btn" onclick="carregarEstoque().then(() => showCategories())">Recarregar Categorias</button>';
+    html += '</div>';
   } else {
-    categories.forEach(category => {
-      // Escapa aspas para evitar erro no JavaScript
-      const safeCategory = (category || '').replace(/"/g, '\\"').replace(/'/g, "\\'");
-      html += `<div class='category-item' onclick='showCategoryProducts("${safeCategory}")'><h4 style="margin:0">${category}</h4></div>`;
-    });
+    console.log('✅ Exibindo', categories.length, 'categorias');
+    
+    // Filtra categorias vazias ou undefined
+    const categoriasFiltradas = categories.filter(cat => cat && cat.trim() !== '');
+    
+    if (categoriasFiltradas.length === 0) {
+      html += '<p style="color:#666;">Nenhuma categoria válida encontrada.</p>';
+    } else {
+      categoriasFiltradas.forEach((category, index) => {
+        console.log(`📝 Categoria ${index + 1}: "${category}"`);
+        
+        // ESCAPA ASPAS CORRETAMENTE
+        const categoriaSegura = (category || '').replace(/"/g, '\\"').replace(/'/g, "\\'");
+        
+        html += `
+          <div class='category-item' onclick='showCategoryProducts("${categoriaSegura}")'>
+            <h4 style="margin:0">${category}</h4>
+            <small style="color:#666">Clique para ver produtos</small>
+          </div>
+        `;
+      });
+    }
   }
+  
   document.getElementById('view').innerHTML = html;
 }
 
@@ -708,6 +553,9 @@ function showCategoryProducts(categoryName){
   currentView = 'category-products';
   let html = `<h3>Categoria: ${categoryName}</h3>`;
   const categoryProducts = products.filter(p => p.categoria === categoryName);
+  
+  console.log(`🔍 Produtos na categoria "${categoryName}":`, categoryProducts.length);
+  
   if(categoryProducts.length === 0){
     html += '<p>Nenhum produto disponível nesta categoria.</p>';
   } else {
@@ -934,28 +782,30 @@ function showUploadComprovante(localizacaoData, descricao) {
     const reader = new FileReader();
     reader.onload = async function(e) {
       const comprovanteBase64 = e.target.result;
-      await carregarEstoque();
       
-      // Gera código do pedido
-      let codigoPedido = Math.floor(Math.random() * 900 + 100);
-      let totalPedido = cart.reduce((total, item) => total + (item.preco * item.qtd), 0);
-      
-      // Atualiza estoque e salva pedido/status na planilha
+      // Atualiza estoque e salva pedido na planilha
       cart.forEach(item => {
         const produto = products.find(p => p.id === item.id);
-        if (produto && produto.estoque !== undefined) {
+        if (produto) {
           produto.estoque -= item.qtd;
-          produto.pedido = codigoPedido; // Salva número do pedido
-          produto.status = 'Pedido recebido - Aguardando confirmação do pagamento'; // Status inicial
-          
-          if (produto.estoque <= 0) { alertaEstoqueZerado(produto); }
         }
       });
       
-      // Salva tudo na planilha
+      let codigoPedido = Math.floor(Math.random() * 900 + 100);
+      let totalPedido = cart.reduce((total, item) => total + (item.preco * item.qtd), 0);
+      
+      // Salva número do pedido e status nos produtos
+      cart.forEach(item => {
+        const produto = products.find(p => p.id === item.id);
+        if (produto) {
+          produto.pedido = codigoPedido.toString();
+          produto.status = 'Pedido recebido - Aguardando confirmação do pagamento';
+        }
+      });
+      
+      // Salva na planilha
       await salvarEstoque();
       
-      // Cria o pedido local
       let pedido = {
         codigo: codigoPedido, 
         produtos: [...cart], 
@@ -976,7 +826,6 @@ function showUploadComprovante(localizacaoData, descricao) {
         codigo: codigoPedido, 
         msg: `Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`, 
         data: pedido.data, 
-        notaFiscal: gerarNotaFiscal(pedido), 
         status: pedido.status 
       });
       
@@ -984,7 +833,7 @@ function showUploadComprovante(localizacaoData, descricao) {
       saveToStorage(); 
       await sendTelegramNotification(pedido);
       
-      alert(`✅ Pedido #${pedido.codigo} confirmado!\n📱 Notificação enviada para o administrador\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n💎 Status será atualizado automaticamente!`);
+      alert(`✅ Pedido #${pedido.codigo} confirmado!\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n📱 Status será atualizado automaticamente!`);
       
       cart = []; 
       saveToStorage(); 
@@ -1000,12 +849,12 @@ function showNotifs(){
   unreadNotifications = 0;
   updateNotificationCounter();
   saveToStorage();
-  let html = '<h3>Notificações dos Pedidos <button class="btn" onclick="verificarStatusAutomatico()" style="margin-left:10px;">🔄 Verificar Status</button></h3>';
+  let html = '<h3>Notificações dos Pedidos <button class="btn" onclick="verificarStatus()" style="margin-left:10px;">🔄 Verificar Status</button></h3>';
   if(notifications.length === 0){ 
     html += '<p>Nenhuma notificação.</p>';
   } else {
     notifications.slice().reverse().forEach(notif => {
-      const podeBaixar = notif.status && ( notif.status.includes('Pagamento confirmado') || notif.status.includes('entregue') );
+      const podeBaixar = notif.status && (notif.status.includes('Pagamento confirmado') || notif.status.includes('entregue'));
       html += `<div class='card'>
         <b>Pedido #${notif.codigo}</b>
         <div>${notif.msg}</div>
@@ -1017,25 +866,11 @@ function showNotifs(){
   document.getElementById('view').innerHTML = html;
 }
 
-async function verificarStatusAutomatico() {
-  console.log('🔄 Verificando status dos pedidos...');
-  await carregarEstoque(); // Isso já atualiza os status da planilha
-  
-  // Força atualização da tela
-  if (currentView === 'notifs') {
-    showNotifs();
-    alert('✅ Status atualizado da planilha!');
-  }
-}
-
-function iniciarVerificacaoAutomatica() {
-  if (statusCheckInterval) clearInterval(statusCheckInterval);
-  // Verifica a cada 30 segundos (30000ms)
-  statusCheckInterval = setInterval(() => {
-    if (currentView === 'notifs') {
-      verificarStatusAutomatico();
-    }
-  }, 30000); // 30 segundos
+async function verificarStatus() {
+  console.log('🔄 Verificando status da planilha...');
+  await carregarEstoque();
+  showNotifs();
+  alert('✅ Status atualizado!');
 }
 
 window.showHome = showHome;
@@ -1053,13 +888,14 @@ window.goBack = goBack;
 window.showHelp = showHelp;
 window.showHelpCategory = showHelpCategory;
 window.baixarNotaFiscalIndividual = baixarNotaFiscalIndividual;
-window.verificarStatusAutomatico = verificarStatusAutomatico;
+window.verificarStatus = verificarStatus;
 
 async function inicializar() {
+  console.log('🚀 Inicializando app...');
   await carregarEstoque();
   loadFromStorage();
   showHome();
-  iniciarVerificacaoAutomatica();
+  console.log('✅ App inicializado!');
 }
 
 inicializar();
