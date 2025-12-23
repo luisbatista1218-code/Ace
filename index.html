@@ -41,12 +41,6 @@
   .input-field {width:100%;padding:12px;margin:10px 0;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;font-size:16px;}
   a {color: #3a0060; font-weight:bold;}
   .finalizar-btn-container {position: sticky; bottom: 50px; background: #1c0035; padding: 15px; margin: -12px; margin-top: 20px;}
-  .status-aguardando {color: #ff9800; font-weight:bold;}
-  .status-pago {color: #4caf50; font-weight:bold;}
-  .status-preparando {color: #2196f3; font-weight:bold;}
-  .status-entrega {color: #9c27b0; font-weight:bold;}
-  .status-entregue {color: #4caf50; font-weight:bold;}
-  .status-cancelado {color: #f44336; font-weight:bold;}
 </style>
 </head>
 <body>
@@ -99,8 +93,7 @@ async function carregarEstoque() {
   try {
     const response = await fetch(API_URL);
     const data = await response.json();
-    console.log('📊 Dados da planilha:', data);
-
+    
     products = [];
     categories = [];
     
@@ -119,8 +112,10 @@ async function carregarEstoque() {
       const estoque = Number(linha.estoque) || 0;
       const descricao = linha.descricao || linha.descrição || linha['descrição '] || linha.Descricao || linha.Descrição || '';
       const imagem = linha.imagem_url || `https://via.placeholder.com/400x200?text=${encodeURIComponent(nome)}`;
-      const pedido = linha.pedido || '';
-      const status = linha.status || 'ativo';
+      
+      // ⚡ NOVOS CAMPOS DA PLANILHA
+      const pedidoNumero = linha.pedido || '';
+      const statusPedido = linha.status || '';
       
       if (id > 0 && nome !== 'Produto sem nome') {
         const produto = {
@@ -131,11 +126,12 @@ async function carregarEstoque() {
           preco: precoValor,
           estoque: estoque,
           imagem: imagem,
-          pedido: pedido,
-          status: status
+          pedido: pedidoNumero,
+          status: statusPedido
         };
         
         products.push(produto);
+        
         if (!categories.includes(categoria)) {
           categories.push(categoria);
         }
@@ -143,33 +139,49 @@ async function carregarEstoque() {
     });
 
     console.log('✅ Produtos carregados:', products.length);
+    
     if (currentView === 'categories' || currentView === 'category-products') {
       showCategories();
     }
-    
-    sincronizarPedidosComPlanilha();
   } catch (error) {
     console.error('❌ Erro ao carregar planilha:', error);
   }
 }
   
-async function salvarEstoque() {
+async function salvarEstoque(produtoComPedido = null) {
   try {
-    const dados = {
-      produtos: products.map(p => ({
-        id: String(p.id),
-        categoria: p.categoria || '',
-        produto: p.nome || '',
-        preço: String(p.preco || 0),
-        estoque: String(p.estoque || 0),
-        imagem: p.imagem || '',
-        descrição: p.descricao || '',
-        pedido: p.pedido || '',
-        status: p.status || 'ativo'
-      }))
-    };
+    let dados;
+    
+    if (produtoComPedido) {
+      dados = {
+        produtos: [{
+          id: String(produtoComPedido.id),
+          categoria: produtoComPedido.categoria || '',
+          produto: produtoComPedido.nome || '',
+          preço: String(produtoComPedido.preco || 0),
+          estoque: String(produtoComPedido.estoque || 0),
+          imagem: produtoComPedido.imagem || '',
+          descrição: produtoComPedido.descricao || '',
+          pedido: produtoComPedido.pedido || '',
+          status: produtoComPedido.status || ''
+        }]
+      };
+    } else {
+      dados = {
+        produtos: products.map(p => ({
+          id: String(p.id),
+          categoria: p.categoria || '',
+          produto: p.nome || '',
+          preço: String(p.preco || 0),
+          estoque: String(p.estoque || 0),
+          imagem: p.imagem || '',
+          descrição: p.descricao || '',
+          pedido: p.pedido || '',
+          status: p.status || ''
+        }))
+      };
+    }
 
-    console.log('📤 Enviando para planilha:', dados);
     const proxyUrl = 'https://corsproxy.io/?';
     const urlCompleta = proxyUrl + encodeURIComponent(SCRIPT_URL);
     
@@ -180,8 +192,6 @@ async function salvarEstoque() {
     });
 
     if (response.ok) {
-      const result = await response.text();
-      console.log('✅ Produtos salvos na planilha!', result);
       return true;
     } else {
       throw new Error('Erro HTTP: ' + response.status);
@@ -194,20 +204,7 @@ async function salvarEstoque() {
       xhr.open('POST', SCRIPT_URL, true);
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.timeout = 5000;
-      xhr.onload = function() { console.log('✅ Produtos salvos (fallback)!'); };
-      xhr.send(JSON.stringify({
-        produtos: products.map(p => ({
-          id: String(p.id),
-          categoria: p.categoria || '',
-          produto: p.nome || '',
-          preço: String(p.preco || 0),
-          estoque: String(p.estoque || 0),
-          imagem: p.imagem || '',
-          descrição: p.descricao || '',
-          pedido: p.pedido || '',
-          status: p.status || 'ativo'
-        }))
-      }));
+      xhr.send(JSON.stringify(dados));
       return true;
     } catch (fallbackErr) {
       console.error("❌ Fallback falhou:", fallbackErr);
@@ -216,7 +213,8 @@ async function salvarEstoque() {
   }
 }
 
-async function sincronizarPedidosComPlanilha() {
+// ⚡ NOVA FUNÇÃO: SINCRONIZAÇÃO AUTOMÁTICA
+async function sincronizarStatusPedidos() {
   try {
     const response = await fetch(API_URL);
     const data = await response.json();
@@ -224,29 +222,35 @@ async function sincronizarPedidosComPlanilha() {
     let atualizou = false;
     
     data.forEach(linha => {
-      const pedidoNum = linha.pedido;
+      const pedidoNumero = linha.pedido;
       const statusPlanilha = linha.status;
       
-      if (pedidoNum && statusPlanilha) {
-        const pedido = orders.find(o => o.codigo == pedidoNum);
-        if (pedido && pedido.status !== statusPlanilha) {
-          console.log(`🔄 Sincronizando pedido #${pedidoNum}: ${pedido.status} → ${statusPlanilha}`);
-          pedido.status = statusPlanilha;
+      if (pedidoNumero && statusPlanilha) {
+        const pedidoIndex = orders.findIndex(o => o.codigo == pedidoNumero);
+        
+        if (pedidoIndex !== -1) {
+          const pedido = orders[pedidoIndex];
           
-          const notificacaoExistente = notifications.find(n => 
-            n.codigo == pedidoNum && n.status === statusPlanilha
-          );
-          
-          if (!notificacaoExistente) {
-            notifications.push({
-              codigo: pedidoNum,
-              msg: `📋 Pedido #${pedidoNum} atualizado: ${statusPlanilha}`,
-              data: new Date().toLocaleString('pt-BR'),
-              notaFiscal: gerarNotaFiscal(pedido),
-              status: statusPlanilha
-            });
-            addNotification();
+          if (pedido.status !== statusPlanilha) {
+            pedido.status = statusPlanilha;
             atualizou = true;
+            
+            const notificacaoExistente = notifications.find(n => 
+              n.codigo == pedidoNumero && n.status === statusPlanilha
+            );
+            
+            if (!notificacaoExistente) {
+              notifications.push({
+                codigo: pedidoNumero,
+                msg: `🔄 Pedido #${pedidoNumero} atualizado: ${statusPlanilha}`,
+                data: new Date().toLocaleString('pt-BR'),
+                notaFiscal: gerarNotaFiscal(pedido),
+                status: statusPlanilha
+              });
+              
+              unreadNotifications++;
+              updateNotificationCounter();
+            }
           }
         }
       }
@@ -257,17 +261,12 @@ async function sincronizarPedidosComPlanilha() {
       if (currentView === 'notifs') {
         showNotifs();
       }
+      console.log('✅ Status sincronizado da planilha');
     }
+    
   } catch (error) {
-    console.error('Erro na sincronização:', error);
+    console.error('❌ Erro na sincronização:', error);
   }
-}
-
-function iniciarSincronizacao() {
-  if (syncInterval) clearInterval(syncInterval);
-  syncInterval = setInterval(async () => {
-    await carregarEstoque();
-  }, 30000);
 }
 
 function iniciarTimeoutCarrinho() {
@@ -294,9 +293,11 @@ async function checkTelegramUpdates() {
           if (text.startsWith('/repor')) { processarReporEstoque(update.message); }
           if (text.startsWith('/list')) { processarListEstoque(update.message); }
         }  
+        
         if (update.callback_query) {
           const data = update.callback_query.data;
           const commandId = `${update.update_id}_${data}`;
+          
           if (data.startsWith('status_') && !processedCommands.has(commandId)) {
             processedCommands.add(commandId);
             processarCallbackStatus(data, update.callback_query);
@@ -315,6 +316,7 @@ const pedidosBloqueados = new Set();
 async function processarCallbackStatus(data, callbackObj) {
   const match = data.match(/status_(\d+)_(\w+)/);
   if (!match) return;
+  
   const codigo = parseInt(match[1]);
   const novoStatus = match[2].toLowerCase();
   const chave = `pedido_${codigo}`;
@@ -331,7 +333,6 @@ async function processarCallbackStatus(data, callbackObj) {
         })
       });
     }
-    console.log(`Ignorado: ${chave} já bloqueado`);
     return;
   }
   
@@ -343,40 +344,13 @@ async function processarCallbackStatus(data, callbackObj) {
     'cancelado': '❌ Pedido cancelado'
   };
   
-  const textoStatus = statusMap[novoStatus];
-  if (!textoStatus) return;
-  
-  const pedido = orders.find(o => o.codigo === codigo);
-  if (!pedido) return;
+  const textoStatus = statusMap[novoStatus] || novoStatus;
   
   if (novoStatus === 'entregue' || novoStatus === 'cancelado') {
     pedidosBloqueados.add(chave);
   }
   
-  pedido.status = textoStatus;
-  
-  const produtoPedido = products.find(p => p.pedido == codigo);
-  if (produtoPedido) {
-    produtoPedido.status = novoStatus;
-    await salvarEstoque();
-  }
-  
-  const notificacaoExistente = notifications.find(n => 
-    n.codigo === codigo && n.status === textoStatus
-  );
-  
-  if (!notificacaoExistente) {
-    notifications.push({
-      codigo: codigo,
-      msg: `🔄 Pedido #${codigo} atualizado: ${textoStatus}`,
-      data: new Date().toLocaleString('pt-BR'),
-      notaFiscal: gerarNotaFiscal(pedido),
-      status: textoStatus
-    });
-    addNotification();
-  }
-  
-  saveToStorage();
+  atualizarStatusPedido(codigo, textoStatus, true);
   
   if (callbackObj?.id) {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
@@ -389,8 +363,83 @@ async function processarCallbackStatus(data, callbackObj) {
       })
     });
   }
+}
+
+// ⚡ FUNÇÃO ATUALIZADA: Agora salva na planilha também
+async function atualizarStatusPedido(codigo, novoStatus, salvarNaPlanilha = false) {
+  const pedido = orders.find(o => o.codigo === codigo);
+  if (pedido && pedido.status !== novoStatus) {
+    pedido.status = novoStatus;
+    
+    // Atualizar produto na planilha se necessário
+    if (salvarNaPlanilha) {
+      const produtoRelacionado = products.find(p => p.pedido == codigo);
+      if (produtoRelacionado) {
+        produtoRelacionado.status = novoStatus;
+        await salvarEstoque(produtoRelacionado);
+      }
+    }
+    
+    const notificacaoExistente = notifications.find(n => 
+      n.codigo === codigo && n.status === novoStatus
+    );
+    
+    if (!notificacaoExistente) {
+      notifications.push({
+        codigo: codigo,
+        msg: `🔄 Pedido #${codigo} atualizado: ${novoStatus}`,
+        data: new Date().toLocaleString('pt-BR'),
+        notaFiscal: gerarNotaFiscal(pedido),
+        status: novoStatus
+      });
+      
+      addNotification();
+    }
+    
+    saveToStorage();
+    
+    if (messageIds[codigo]) {
+      await atualizarMensagemTelegram(codigo, pedido);
+    }
+    
+    if (currentView === 'notifs') {
+      showNotifs();
+    }
+  }
+}
+
+async function atualizarMensagemTelegram(codigo, pedido) {
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [ { text: "✅ Pago", callback_data: `status_${codigo}_pago` }, { text: "👨‍🍳 Preparando", callback_data: `status_${codigo}_preparando` } ],
+      [ { text: "🚚 Entrega", callback_data: `status_${codigo}_entrega` }, { text: "🎉 Entregue", callback_data: `status_${codigo}_entregue` } ],
+      [ { text: "❌ Cancelar", callback_data: `status_${codigo}_cancelado` } ]
+    ]
+  };
   
-  console.log(`Status de ${codigo} atualizado para: ${textoStatus}`);
+  const message = `📦 *PEDIDO #${pedido.codigo}* - ${pedido.status}\n\n💰 *Total:* R$ ${pedido.total.toFixed(2)}\n📍 *Endereço:* ${pedido.local}\n📱 *Telefone:* ${pedido.whatsapp}\n📋 *Itens:* ${pedido.produtos.map(p => `${p.nome} (x${p.qtd})`).join(', ')}\n⏰ *Data:* ${pedido.data}`;
+  
+  try {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        message_id: messageIds[codigo],
+        text: message,
+        parse_mode: 'Markdown',
+        reply_markup: inlineKeyboard
+      })
+    });
+    
+    const result = await response.json();
+    if (!result.ok) {
+      console.error('Erro ao atualizar mensagem:', result);
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar mensagem:', error);
+  }
 }
 
 async function alertaEstoqueZerado(produto) {
@@ -404,7 +453,10 @@ async function alertaEstoqueZerado(produto) {
 
 async function processarListEstoque(message) {
   await carregarEstoque();
-  const estoqueMsg = `📦 *ESTOQUE ATUAL*\n\n` + products.map(p => `• ${p.nome}: ${p.estoque} unidades (R$ ${p.preco.toFixed(2)})`).join('\n') + `\n\n📊 Total de produtos: ${products.length}`;
+  const estoqueMsg = `📦 *ESTOQUE ATUAL*\n\n` + 
+    products.map(p => `• ${p.nome}: ${p.estoque} unidades (R$ ${p.preco.toFixed(2)})${p.pedido ? ` - Pedido #${p.pedido}: ${p.status}` : ''}`).join('\n') + 
+    `\n\n📊 Total de produtos: ${products.length}`;
+  
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -415,9 +467,11 @@ async function processarListEstoque(message) {
 async function processarReporEstoque(message) {
   const match = message.text.match(/\/repor (\d+) (\d+)/);
   if (!match) return;
+  
   const id = parseInt(match[1]);
   const quantidade = parseInt(match[2]);
   const produto = products.find(p => p.id === id);
+  
   if (!produto) {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -426,8 +480,10 @@ async function processarReporEstoque(message) {
     });
     return;
   }
+  
   produto.estoque = quantidade;
-  const sucesso = await salvarEstoque();
+  const sucesso = await salvarEstoque(produto);
+  
   if (sucesso) {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -435,6 +491,15 @@ async function processarReporEstoque(message) {
       body: JSON.stringify({ chat_id: message.chat.id, text: `✅ Estoque de ${produto.nome} atualizado para ${quantidade} unidades!`, parse_mode: 'Markdown' })
     });
   }
+}
+
+// ⚡ INICIALIZA SINCRONIZAÇÃO AUTOMÁTICA
+function iniciarSincronizacao() {
+  if (syncInterval) clearInterval(syncInterval);
+  syncInterval = setInterval(async () => {
+    await carregarEstoque();
+    await sincronizarStatusPedidos();
+  }, 10000); // Sincroniza a cada 10 segundos
 }
 
 setInterval(checkTelegramUpdates, 2000);
@@ -445,14 +510,19 @@ function loadFromStorage() {
     if (stored) {
       const data = JSON.parse(stored);
       const now = Date.now();
+      
       if (now - data.timestamp < SESSION_DURATION) {
         cart = data.cart || [];
         notifications = data.notifications || [];
         orders = data.orders || [];
         unreadNotifications = data.unreadNotifications || 0;
         updateNotificationCounter();
-        if (cart.length > 0) { iniciarTimeoutCarrinho(); }
-      } else { clearStorage(); }
+        if (cart.length > 0) {
+          iniciarTimeoutCarrinho();
+        }
+      } else {
+        clearStorage();
+      }
     }
   } catch (e) {
     console.error('Erro ao carregar dados:', e);
@@ -482,6 +552,7 @@ function clearStorage() {
 function updateNotificationCounter() {
   const counter = document.getElementById('notificationCounter');
   const notifBtn = document.getElementById('notifBtn');
+  
   if (unreadNotifications > 0) {
     counter.style.display = 'flex';
     counter.textContent = unreadNotifications > 99 ? '99+' : unreadNotifications;
@@ -522,6 +593,7 @@ function showHelpCategory(categoria){
     pagamento: { titulo: "💳 Processo de Pagamento", texto: `1. <strong>Localização</strong>: O app detecta automaticamente seu endereço via GPS.<br><br>2. <strong>Dados</strong>: Confirme ou edite o endereço e informe seu telefone.<br><br>3. <strong>PIX</strong>: Você receberá a chave PIX e valor exato para pagamento.<br><br>4. <strong>Comprovante</strong>: Envie foto ou PDF do comprovante pelo próprio app.<br><br>5. <strong>Confirmação</strong>: Após análise, seu pedido será confirmado.` },
     contato: { titulo: "📞 Contato e Suporte", texto: `1. <strong>Telefone</strong>: (11) 99999-9999 para emergências<br><br>2. <strong>WhatsApp</strong>: Use o mesmo número para mensagens<br><br>3. <strong>Email</strong>: contato@delivery.com para dúvidas<br><br>4. <strong>PIX</strong>: Chave 123.456.789-00 para pagamentos<br><br>5. <strong>Horário</strong>: Atendimento das 10h às 22h` }
   };
+  
   const html = `<div class='card'><b>${conteudos[categoria].titulo}</b><div>${conteudos[categoria].texto}</div><button class="btn" onclick="showHelp()" style="margin-top: 10px;">← Voltar à Ajuda</button></div>`;
   document.getElementById('view').innerHTML = html;
 }
@@ -534,7 +606,9 @@ async function sendTelegramNotification(pedido) {
       [ { text: "❌ Cancelar", callback_data: `status_${pedido.codigo}_cancelado` } ]
     ]
   };
+  
   const message = `📦 *PEDIDO #${pedido.codigo}* - ${pedido.status}\n\n💰 *Total:* R$ ${pedido.total.toFixed(2)}\n📍 *Endereço:* ${pedido.local}\n📱 *Telefone:* ${pedido.whatsapp}\n📋 *Itens:* ${pedido.produtos.map(p => `${p.nome} (x${p.qtd})`).join(', ')}\n⏰ *Data:* ${pedido.data}`;
+  
   try {
     const messageUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
     const messageResponse = await fetch(messageUrl, {
@@ -542,12 +616,62 @@ async function sendTelegramNotification(pedido) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'Markdown', reply_markup: inlineKeyboard })
     });
+    
     const messageResult = await messageResponse.json();
-    if (messageResult.ok && messageResult.result) { messageIds[pedido.codigo] = messageResult.result.message_id; }
-    if (pedido.mapaUrl) { await sendLocalizacaoToTelegram(pedido); }
-    if (pedido.comprovante) { await sendComprovanteToTelegram(pedido); }
-    if (!messageResult.ok) { console.error('Erro Telegram:', messageResult); }
-  } catch (error) { console.error('Erro ao conectar com Telegram:', error); }
+    
+    if (messageResult.ok && messageResult.result) {
+      messageIds[pedido.codigo] = messageResult.result.message_id;
+    }
+    
+    // ⚡ SALVA PEDIDO NA PLANILHA
+    await salvarPedidoNaPlanilha(pedido);
+    
+    if (pedido.mapaUrl) {
+      await sendLocalizacaoToTelegram(pedido);
+    }
+    
+    if (pedido.comprovante) {
+      await sendComprovanteToTelegram(pedido);
+    }
+    
+    if (!messageResult.ok) {
+      console.error('Erro Telegram:', messageResult);
+    }
+  } catch (error) {
+    console.error('Erro ao conectar com Telegram:', error);
+  }
+}
+
+// ⚡ NOVA FUNÇÃO: Salva pedido na planilha
+async function salvarPedidoNaPlanilha(pedido) {
+  try {
+    // Atualiza estoque primeiro
+    await carregarEstoque();
+    
+    pedido.produtos.forEach(itemPedido => {
+      const produto = products.find(p => p.id === itemPedido.id);
+      if (produto) {
+        produto.estoque -= itemPedido.qtd;
+        produto.pedido = pedido.codigo;
+        produto.status = pedido.status;
+        
+        if (produto.estoque <= 0) {
+          alertaEstoqueZerado(produto);
+        }
+      }
+    });
+    
+    // Salva cada produto atualizado
+    for (const produto of products) {
+      if (produto.pedido === pedido.codigo) {
+        await salvarEstoque(produto);
+      }
+    }
+    
+    console.log('✅ Pedido salvo na planilha:', pedido.codigo);
+  } catch (error) {
+    console.error('❌ Erro ao salvar pedido na planilha:', error);
+  }
 }
 
 async function sendLocalizacaoToTelegram(pedido) {
@@ -559,7 +683,9 @@ async function sendLocalizacaoToTelegram(pedido) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'Markdown' })
     });
-  } catch (error) { console.error('Erro ao enviar localização:', error); }
+  } catch (error) {
+    console.error('Erro ao enviar localização:', error);
+  }
 }
 
 async function sendComprovanteToTelegram(pedido) {
@@ -567,17 +693,27 @@ async function sendComprovanteToTelegram(pedido) {
     const base64Data = pedido.comprovante.split(',')[1];
     const binaryString = atob(base64Data);
     const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
+    
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
     const blob = new Blob([bytes], { type: pedido.comprovanteTipo });
     const formData = new FormData();
     formData.append('chat_id', CHAT_ID);
     formData.append('document', blob, pedido.comprovanteNome);
     formData.append('caption', `📎 COMPROVANTE PEDIDO #${pedido.codigo}\n💳 Valor: R$ ${pedido.total.toFixed(2)}`);
+    
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`;
     const response = await fetch(url, { method: 'POST', body: formData });
     const result = await response.json();
-    if (!result.ok) { console.error('Erro ao enviar comprovante:', result); }
-  } catch (error) { console.error('Erro ao enviar comprovante para Telegram:', error); }
+    
+    if (!result.ok) {
+      console.error('Erro ao enviar comprovante:', result);
+    }
+  } catch (error) {
+    console.error('Erro ao enviar comprovante para Telegram:', error);
+  }
 }
 
 function gerarNotaFiscal(pedido) {
@@ -595,6 +731,7 @@ function gerarNotaFiscal(pedido) {
 function baixarNotaFiscalIndividual(codigo) {
   const pedido = orders.find(o => o.codigo === codigo);
   if (!pedido) { alert('Pedido não encontrado!'); return; }
+  
   const notaHTML = `
     <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
       <div style="text-align: center; border-bottom: 2px solid #3a0060; padding-bottom: 15px; margin-bottom: 20px;">
@@ -636,6 +773,7 @@ function baixarNotaFiscalIndividual(codigo) {
       </div>
     </div>
   `;
+  
   const blob = new Blob([notaHTML], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -917,57 +1055,18 @@ function showUploadComprovante(localizacaoData, descricao) {
     const reader = new FileReader();
     reader.onload = async function(e) {
       const comprovanteBase64 = e.target.result;
-      await carregarEstoque();
-      
       let codigoPedido = Math.floor(Math.random() * 900 + 100);
       let totalPedido = cart.reduce((total, item) => total + (item.preco * item.qtd), 0);
-      
-      cart.forEach(item => {
-        const produto = products.find(p => p.id === item.id);
-        if (produto && produto.estoque !== undefined) {
-          produto.estoque -= item.qtd;
-          produto.pedido = codigoPedido;
-          produto.status = 'aguardando';
-          
-          if (produto.estoque <= 0) { alertaEstoqueZerado(produto); }
-        }
-      });
-      
-      await salvarEstoque();
-      
       let pedido = {
-        codigo: codigoPedido,
-        produtos: [...cart],
-        total: totalPedido,
-        local: localizacao,
-        mapaUrl: mapaUrl,
-        desc: descricao || '',
-        whatsapp: whatsapp,
-        comprovante: comprovanteBase64,
-        comprovanteNome: selectedFile.name,
-        comprovanteTipo: selectedFile.type,
-        data: new Date().toLocaleString('pt-BR'),
-        status: '🟡 Aguardando pagamento'
+        codigo: codigoPedido, produtos: [...cart], total: totalPedido, local: localizacao, mapaUrl: mapaUrl, desc: descricao || '',
+        whatsapp: whatsapp, comprovante: comprovanteBase64, comprovanteNome: selectedFile.name, comprovanteTipo: selectedFile.type,
+        data: new Date().toLocaleString('pt-BR'), status: 'Pedido recebido - Aguardando confirmação do pagamento'
       };
-      
       orders.push(pedido);
-      notifications.push({
-        codigo: codigoPedido,
-        msg: `📋 Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`,
-        data: pedido.data,
-        notaFiscal: gerarNotaFiscal(pedido),
-        status: pedido.status
-      });
-      
-      addNotification();
-      saveToStorage();
-      await sendTelegramNotification(pedido);
-      
+      notifications.push({ codigo: codigoPedido, msg: `Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`, data: pedido.data, notaFiscal: gerarNotaFiscal(pedido), status: pedido.status });
+      addNotification(); saveToStorage(); await sendTelegramNotification(pedido);
       alert(`✅ Pedido #${pedido.codigo} confirmado!\n📱 Notificação enviada para o administrador\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n💎 Use o botão "Nota Fiscal" para baixar seus pedidos!`);
-
-      cart = [];
-      saveToStorage();
-      showHome();
+      cart = []; saveToStorage(); showHome();
     };
     reader.onerror = function() { alert('❌ Erro ao ler o arquivo. Tente novamente.'); };
     reader.readAsDataURL(selectedFile);
@@ -984,19 +1083,12 @@ function showNotifs(){
     html += '<p>Nenhuma notificação.</p>';
   } else {
     notifications.slice().reverse().forEach(notif => {
-      const podeBaixar = notif.status && ( notif.status.includes('Pagamento confirmado') || notif.status.includes('Entregue') );
-      const statusClass = notif.status.includes('Aguardando') ? 'status-aguardando' :
-                         notif.status.includes('confirmado') ? 'status-pago' :
-                         notif.status.includes('Preparando') ? 'status-preparando' :
-                         notif.status.includes('Entrega') ? 'status-entrega' :
-                         notif.status.includes('Entregue') ? 'status-entregue' :
-                         notif.status.includes('Cancelado') ? 'status-cancelado' : '';
-      
+      const podeBaixar = notif.status && ( notif.status.includes('Pagamento confirmado') );
       html += `<div class='card'>
         <b>Pedido #${notif.codigo}</b>
         <div>${notif.msg}</div>
-        <div class="${statusClass}">${notif.status}</div>
         <small>${notif.data}</small>
+        <p><strong>Status:</strong> ${notif.status}</p>
         ${podeBaixar ? `<button class="btn" onclick="baixarNotaFiscalIndividual(${notif.codigo})" style="margin-top: 10px;">📄 Baixar Nota Fiscal</button>` : ''}
       </div>`;
     });
@@ -1023,8 +1115,8 @@ window.baixarNotaFiscalIndividual = baixarNotaFiscalIndividual;
 async function inicializar() {
   await carregarEstoque();
   loadFromStorage();
-  showHome();
   iniciarSincronizacao();
+  showHome();
 }
 
 inicializar();
