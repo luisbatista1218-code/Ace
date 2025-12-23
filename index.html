@@ -87,42 +87,46 @@ let messageIds = {};
 let processedCommands = new Set();
 let lastLocalizacaoData = null;
 let cartTimeout;
+let carregamentoEmAndamento = false;
 
 async function carregarEstoque() {
+  if (carregamentoEmAndamento) return;
+  
   try {
-    console.log('🔍 Carregando dados da planilha...');
-    const response = await fetch(API_URL);
-    const data = await response.json();
+    carregamentoEmAndamento = true;
     
-    console.log('📊 Primeira linha da planilha:', data[0]);
-    console.log('📊 Colunas disponíveis:', Object.keys(data[0]));
+    // Timeout de 5 segundos
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(`${API_URL}?t=${Date.now()}`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    const data = await response.json();
+    console.log('📊 Dados BRUTOS da planilha (primeira linha):', data[0]);
 
     products = [];
     categories = [];
     
     data.forEach(linha => {
-      console.log('🔍 Processando linha:', linha);
-      
       const id = Number(linha.id) || 0;
       
-      // TENTA TODAS AS POSSIBILIDADES para categoria
-      const categoria = linha.categoria || linha.Categoria || linha['Categoria '] || 
-                       linha['categoria '] || linha['CATEGORIA'] || linha.CATEGORIA || 'Sem Categoria';
+      // ⚡ **ESTRUTURA DA PLANILHA:**
+      // id (0), categoria (1), produto (2), preço (3), estoque (4), 
+      // imagem_url (5), descrição (6), pedido (7), status (8)
       
-      console.log('🔍 Categoria encontrada:', categoria);
-      
-      const nome = linha.produto || linha.Produto || linha['Produto '] || 
-                  linha['produto '] || linha.PRODUTO || 'Produto sem nome';
+      const categoria = linha.categoria || linha.Categoria || 'Sem Categoria';
+      const nome = linha.produto || linha.Produto || 'Produto sem nome';
       
       let precoValor = 0;
-      const precoRaw = linha.preco || linha.preço || linha['preço '] || linha.Preco || linha.Preço || '0';
+      const precoRaw = linha.preco || linha.preço || linha.Preco || linha.Preço || '0';
       if (precoRaw && precoRaw !== '') {
         const precoStr = String(precoRaw).replace('R$', '').replace(',', '.').replace(/\s/g, '').trim();
         precoValor = parseFloat(precoStr) || 0;
       }
       
       const estoque = Number(linha.estoque) || 0;
-      const descricao = linha.descricao || linha.descrição || linha['descrição '] || linha.Descricao || linha.Descrição || '';
+      const descricao = linha.descricao || linha.descrição || linha.Descricao || linha.Descrição || '';
       const imagem = linha.imagem_url || `https://via.placeholder.com/400x200?text=${encodeURIComponent(nome)}`;
       const pedido = linha.pedido || '';
       const status = linha.status || '';
@@ -140,11 +144,10 @@ async function carregarEstoque() {
           status: status
         };
         
-        console.log(`✅ Produto ${id}: "${nome}" | Categoria: "${categoria}"`);
+        console.log(`✅ Produto ${id}: "${nome}" | Status: ${status} | Pedido: ${pedido}`);
         products.push(produto);
         
-        // Adiciona categoria SE NÃO ESTIVER VAZIA
-        if (categoria && categoria.trim() !== '' && categoria !== 'Sem Categoria' && !categories.includes(categoria)) {
+        if (categoria && !categories.includes(categoria)) {
           categories.push(categoria);
         }
       }
@@ -152,49 +155,56 @@ async function carregarEstoque() {
 
     console.log('✅ Total de produtos carregados:', products.length);
     console.log('✅ Categorias encontradas:', categories);
-    console.log('✅ Quantidade de categorias:', categories.length);
 
-    // ATUALIZA STATUS DOS PEDIDOS baseado na planilha
-    atualizarStatusDaPlanilha();
-
+    // Atualiza notificações com base nos status da planilha
+    atualizarNotificacoesDaPlanilha();
+    
+    if (currentView === 'categories' || currentView === 'category-products') {
+      showCategories();
+    }
   } catch (error) {
     console.error('❌ Erro ao carregar planilha:', error);
+    // Fallback: tenta carregar categorias básicas
+    if (categories.length === 0) {
+      categories = ['Pizza', 'Bebidas', 'Sobremesas'];
+    }
+  } finally {
+    carregamentoEmAndamento = false;
   }
 }
 
-function atualizarStatusDaPlanilha() {
-  console.log('🔄 Atualizando status dos pedidos da planilha...');
-  
+function atualizarNotificacoesDaPlanilha() {
+  // Verifica se há pedidos na planilha com status atualizados
   products.forEach(produto => {
     if (produto.pedido && produto.status) {
-      const codigoPedido = parseInt(produto.pedido);
-      const pedido = orders.find(o => o.codigo === codigoPedido);
-      
-      if (pedido && pedido.status !== produto.status) {
-        console.log(`📋 Atualizando pedido #${codigoPedido}: ${pedido.status} -> ${produto.status}`);
-        pedido.status = produto.status;
+      const codigoPedido = Number(produto.pedido);
+      if (!isNaN(codigoPedido)) {
+        const pedidoExistente = orders.find(o => o.codigo === codigoPedido);
         
-        const notificacaoExistente = notifications.find(n => 
-          n.codigo === codigoPedido && n.status === produto.status
-        );
-        
-        if (!notificacaoExistente) {
-          notifications.push({
-            codigo: codigoPedido,
-            msg: `🔄 Pedido #${codigoPedido} atualizado: ${produto.status}`,
-            data: new Date().toLocaleString('pt-BR'),
-            status: produto.status
-          });
-          addNotification();
+        if (pedidoExistente && pedidoExistente.status !== produto.status) {
+          // Status foi atualizado na planilha
+          pedidoExistente.status = produto.status;
+          
+          // Adiciona notificação
+          const notifExistente = notifications.find(n => 
+            n.codigo === codigoPedido && n.status === produto.status
+          );
+          
+          if (!notifExistente) {
+            notifications.push({
+              codigo: codigoPedido,
+              msg: `📦 Pedido #${codigoPedido} atualizado: ${produto.status}`,
+              data: new Date().toLocaleString('pt-BR'),
+              status: produto.status
+            });
+            addNotification();
+          }
         }
       }
     }
   });
   
   saveToStorage();
-  if (currentView === 'notifs') {
-    showNotifs();
-  }
 }
   
 async function salvarEstoque() {
@@ -208,14 +218,16 @@ async function salvarEstoque() {
         estoque: String(p.estoque || 0),
         imagem: p.imagem || '',
         descrição: p.descricao || '',
-        pedido: p.pedido || '',
-        status: p.status || ''
+        pedido: p.pedido || '',      // ⬅️ ENVIA NÚMERO DO PEDIDO
+        status: p.status || ''       // ⬅️ ENVIA STATUS
       }))
     };
 
-    console.log('📤 Enviando para planilha:', dados.produtos.length, 'produtos');
+    console.log('📤 Enviando para planilha:', dados);
+    const proxyUrl = 'https://corsproxy.io/?';
+    const urlCompleta = proxyUrl + encodeURIComponent(SCRIPT_URL);
     
-    const response = await fetch(SCRIPT_URL, {
+    const response = await fetch(urlCompleta, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dados)
@@ -223,7 +235,7 @@ async function salvarEstoque() {
 
     if (response.ok) {
       const result = await response.text();
-      console.log('✅ Produtos salvos na planilha!');
+      console.log('✅ Produtos salvos na planilha!', result);
       return true;
     } else {
       throw new Error('Erro HTTP: ' + response.status);
@@ -231,7 +243,30 @@ async function salvarEstoque() {
 
   } catch (err) {
     console.error("❌ Erro ao salvar:", err);
-    return false;
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', SCRIPT_URL, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.timeout = 5000;
+      xhr.onload = function() { console.log('✅ Produtos salvos (fallback)!'); };
+      xhr.send(JSON.stringify({
+        produtos: products.map(p => ({
+          id: String(p.id),
+          categoria: p.categoria || '',
+          produto: p.nome || '',
+          preço: String(p.preco || 0),
+          estoque: String(p.estoque || 0),
+          imagem: p.imagem || '',
+          descrição: p.descricao || '',
+          pedido: p.pedido || '',    // ⬅️ ENVIA NÚMERO DO PEDIDO
+          status: p.status || ''     // ⬅️ ENVIA STATUS
+        }))
+      }));
+      return true;
+    } catch (fallbackErr) {
+      console.error("❌ Fallback falhou:", fallbackErr);
+      return false;
+    }
   }
 }
 
@@ -258,6 +293,14 @@ async function checkTelegramUpdates() {
           const text = update.message.text;
           if (text.startsWith('/repor')) { processarReporEstoque(update.message); }
           if (text.startsWith('/list')) { processarListEstoque(update.message); }
+        }  
+        if (update.callback_query) {
+          const data = update.callback_query.data;
+          const commandId = `${update.update_id}_${data}`;
+          if (data.startsWith('status_') && !processedCommands.has(commandId)) {
+            processedCommands.add(commandId);
+            processarCallbackStatus(data, update.callback_query);
+          }
         }
         lastUpdateId = update.update_id;
       });
@@ -265,6 +308,147 @@ async function checkTelegramUpdates() {
   } catch (error) {
     console.error('Erro ao verificar atualizações:', error);
   }
+}
+
+const pedidosBloqueados = new Set();
+
+async function processarCallbackStatus(data, callbackObj) {
+  const match = data.match(/status_(\d+)_(\w+)/);
+  if (!match) return;
+  const codigo = parseInt(match[1]);
+  const novoStatus = match[2].toLowerCase();
+  const chave = `pedido_${codigo}`;
+  if (pedidosBloqueados.has(chave)) {
+    if (callbackObj?.id) {
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          callback_query_id: callbackObj.id,
+          text: 'Este pedido já foi concluído.',
+          show_alert: false
+        })
+      });
+    }
+    console.log(`Ignorado: ${chave} já bloqueado`);
+    return;
+  }
+  const statusMap = {
+    'pago': '✅ Pagamento confirmado',
+    'preparando': '👨‍🍳 Preparando pedido',
+    'entrega': '🚚 Saiu para entrega',
+    'entregue': '🎉 Pedido entregue',
+    'cancelado': '❌ Pedido cancelado'
+  };
+  const textoStatus = statusMap[novoStatus];
+  if (!textoStatus) return;
+  if (novoStatus === 'entregue' || novoStatus === 'cancelado') {
+    pedidosBloqueados.add(chave);
+  }
+  
+  // Atualiza na planilha via products
+  atualizarStatusNaPlanilha(codigo, textoStatus);
+  
+  if (callbackObj?.id) {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        callback_query_id: callbackObj.id,
+        text: `Status atualizado: ${textoStatus}`,
+        show_alert: false
+      })
+    });
+  }
+  console.log(`Status de ${codigo} atualizado para: ${textoStatus}`);
+}
+
+function atualizarStatusNaPlanilha(codigo, novoStatus) {
+  // Atualiza nos produtos para depois salvar na planilha
+  orders.forEach(pedido => {
+    if (pedido.codigo === codigo) {
+      pedido.status = novoStatus;
+      pedido.produtos.forEach(itemProduto => {
+        const produto = products.find(p => p.id === itemProduto.id);
+        if (produto) {
+          produto.pedido = String(codigo);
+          produto.status = novoStatus;
+        }
+      });
+    }
+  });
+  
+  // Salva na planilha
+  salvarEstoque().then(() => {
+    console.log(`✅ Status ${novoStatus} salvo na planilha para pedido ${codigo}`);
+  });
+}
+
+function atualizarStatusPedido(codigo, novoStatus) {
+  const pedido = orders.find(o => o.codigo === codigo);
+  if (pedido && pedido.status !== novoStatus) {
+    pedido.status = novoStatus;
+    
+    // Atualiza também nos produtos
+    pedido.produtos.forEach(itemProduto => {
+      const produto = products.find(p => p.id === itemProduto.id);
+      if (produto) {
+        produto.pedido = String(codigo);
+        produto.status = novoStatus;
+      }
+    });
+    
+    const notificacaoExistente = notifications.find(n => n.codigo === codigo && n.status === novoStatus);
+    if (!notificacaoExistente) {
+      notifications.push({
+        codigo: codigo,
+        msg: `🔄 Pedido #${codigo} atualizado: ${novoStatus}`,
+        data: new Date().toLocaleString('pt-BR'),
+        notaFiscal: gerarNotaFiscal(pedido),
+        status: novoStatus
+      });
+      addNotification();
+    }
+    saveToStorage();
+    if (messageIds[codigo]) { atualizarMensagemTelegram(codigo, pedido); }
+    if (currentView === 'notifs') { showNotifs(); }
+  }
+}
+
+async function atualizarMensagemTelegram(codigo, pedido) {
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [ { text: "✅ Pago", callback_data: `status_${codigo}_pago` }, { text: "👨‍🍳 Preparando", callback_data: `status_${codigo}_preparando` } ],
+      [ { text: "🚚 Entrega", callback_data: `status_${codigo}_entrega` }, { text: "🎉 Entregue", callback_data: `status_${codigo}_entregue` } ],
+      [ { text: "❌ Cancelar", callback_data: `status_${codigo}_cancelado` } ]
+    ]
+  };
+  const message = `📦 *PEDIDO #${pedido.codigo}* - ${pedido.status}\n\n💰 *Total:* R$ ${pedido.total.toFixed(2)}\n📍 *Endereço:* ${pedido.local}\n📱 *Telefone:* ${pedido.whatsapp}\n📋 *Itens:* ${pedido.produtos.map(p => `${p.nome} (x${p.qtd})`).join(', ')}\n⏰ *Data:* ${pedido.data}`;
+  try {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        message_id: messageIds[codigo],
+        text: message,
+        parse_mode: 'Markdown',
+        reply_markup: inlineKeyboard
+      })
+    });
+    const result = await response.json();
+    if (!result.ok) { console.error('Erro ao atualizar mensagem:', result); }
+  } catch (error) { console.error('Erro ao atualizar mensagem:', error); }
+}
+
+async function alertaEstoqueZerado(produto) {
+  const mensagem = `🚨 *ESTOQUE ZERADO!*\n\n📦 ${produto.nome} está ESGOTADO!\n`;
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ chat_id: CHAT_ID, text: mensagem, parse_mode: 'Markdown' })
+  });
 }
 
 async function processarListEstoque(message) {
@@ -302,7 +486,7 @@ async function processarReporEstoque(message) {
   }
 }
 
-setInterval(checkTelegramUpdates, 5000);
+setInterval(checkTelegramUpdates, 2000);
 
 function loadFromStorage() {
   try {
@@ -408,11 +592,41 @@ async function sendTelegramNotification(pedido) {
       body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'Markdown', reply_markup: inlineKeyboard })
     });
     const messageResult = await messageResponse.json();
-    if (messageResult.ok && messageResult.result) { 
-      messageIds[pedido.codigo] = messageResult.result.message_id; 
-    }
+    if (messageResult.ok && messageResult.result) { messageIds[pedido.codigo] = messageResult.result.message_id; }
+    if (pedido.mapaUrl) { await sendLocalizacaoToTelegram(pedido); }
+    if (pedido.comprovante) { await sendComprovanteToTelegram(pedido); }
     if (!messageResult.ok) { console.error('Erro Telegram:', messageResult); }
   } catch (error) { console.error('Erro ao conectar com Telegram:', error); }
+}
+
+async function sendLocalizacaoToTelegram(pedido) {
+  try {
+    const message = `📍 *LOCALIZAÇÃO DO PEDIDO #${pedido.codigo}*\n\n🗺️ [Abrir no Google Maps](${pedido.mapaUrl})`;
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'Markdown' })
+    });
+  } catch (error) { console.error('Erro ao enviar localização:', error); }
+}
+
+async function sendComprovanteToTelegram(pedido) {
+  try {
+    const base64Data = pedido.comprovante.split(',')[1];
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
+    const blob = new Blob([bytes], { type: pedido.comprovanteTipo });
+    const formData = new FormData();
+    formData.append('chat_id', CHAT_ID);
+    formData.append('document', blob, pedido.comprovanteNome);
+    formData.append('caption', `📎 COMPROVANTE PEDIDO #${pedido.codigo}\n💳 Valor: R$ ${pedido.total.toFixed(2)}`);
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`;
+    const response = await fetch(url, { method: 'POST', body: formData });
+    const result = await response.json();
+    if (!result.ok) { console.error('Erro ao enviar comprovante:', result); }
+  } catch (error) { console.error('Erro ao enviar comprovante para Telegram:', error); }
 }
 
 function gerarNotaFiscal(pedido) {
@@ -422,7 +636,8 @@ function gerarNotaFiscal(pedido) {
     cliente: { telefone: pedido.whatsapp, endereco: pedido.local },
     itens: pedido.produtos.map(item => ({ nome: item.nome, quantidade: item.qtd, preco_unitario: item.preco, subtotal: item.preco * item.qtd })),
     totais: { subtotal: pedido.produtos.reduce((sum, item) => sum + (item.preco * item.qtd), 0), total: pedido.total },
-    status: pedido.status || "Pagamento confirmado"
+    status: "Pagamento confirmado",
+    comprovante: pedido.comprovante ? "Enviado" : "Não enviado"
   };
 }
 
@@ -439,7 +654,7 @@ function baixarNotaFiscalIndividual(codigo) {
       <div style="margin-bottom: 15px;">
         <p><strong>Pedido:</strong> #${pedido.codigo}</p>
         <p><strong>Data:</strong> ${pedido.data}</p>
-        <p><strong>Status:</strong> ${pedido.status || 'Pagamento confirmado'}</p>
+        <p><strong>Status:</strong> Pagamento confirmado</p>
       </div>
       <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
         <thead>
@@ -510,32 +725,26 @@ function showHome(){
 
 function showCategories(){
   currentView = 'categories';
-  console.log('🔍 Mostrando categorias. Array categories:', categories);
-  console.log('🔍 Tamanho do array:', categories.length);
-  
   let html = "<h3>Categorias</h3>";
   
+  console.log('🔍 Mostrando categorias, total:', categories.length);
+  
   if (categories.length === 0) {
-    console.log('⚠️ Nenhuma categoria encontrada! Tentando carregar...');
-    html += '<div style="background:#fff3cd;padding:15px;border-radius:8px;color:#856404;">';
-    html += '<p>⏳ Nenhuma categoria carregada ainda.</p>';
-    html += '<button class="btn" onclick="carregarEstoque().then(() => showCategories())">Recarregar Categorias</button>';
-    html += '</div>';
+    html += `
+      <div class="card">
+        <p>⏳ Carregando categorias da planilha...</p>
+        <button class="btn" onclick="carregarEstoque()">Recarregar Dados</button>
+      </div>
+    `;
   } else {
-    console.log('✅ Exibindo', categories.length, 'categorias');
+    // Filtra categorias vazias
+    const categoriasValidas = categories.filter(c => c && c.trim() !== '');
     
-    // Filtra categorias vazias ou undefined
-    const categoriasFiltradas = categories.filter(cat => cat && cat.trim() !== '');
-    
-    if (categoriasFiltradas.length === 0) {
-      html += '<p style="color:#666;">Nenhuma categoria válida encontrada.</p>';
+    if (categoriasValidas.length === 0) {
+      html += '<p>Nenhuma categoria encontrada na planilha.</p>';
     } else {
-      categoriasFiltradas.forEach((category, index) => {
-        console.log(`📝 Categoria ${index + 1}: "${category}"`);
-        
-        // ESCAPA ASPAS CORRETAMENTE
+      categoriasValidas.forEach(category => {
         const categoriaSegura = (category || '').replace(/"/g, '\\"').replace(/'/g, "\\'");
-        
         html += `
           <div class='category-item' onclick='showCategoryProducts("${categoriaSegura}")'>
             <h4 style="margin:0">${category}</h4>
@@ -554,10 +763,8 @@ function showCategoryProducts(categoryName){
   let html = `<h3>Categoria: ${categoryName}</h3>`;
   const categoryProducts = products.filter(p => p.categoria === categoryName);
   
-  console.log(`🔍 Produtos na categoria "${categoryName}":`, categoryProducts.length);
-  
   if(categoryProducts.length === 0){
-    html += '<p>Nenhum produto disponível nesta categoria.</p>';
+    html += '<div class="card"><p>Nenhum produto disponível nesta categoria.</p></div>';
   } else {
     categoryProducts.forEach(p => {
       const emEstoque = p.estoque > 0;
@@ -571,6 +778,7 @@ function showCategoryProducts(categoryName){
           </button>
           <span style='margin-left:10px; font-weight:bold'>R$ ${p.preco.toFixed(2)}</span>
         </div>
+        ${p.pedido ? `<small style="color:#666; display:block; margin-top:5px;">Pedido: ${p.pedido} | Status: ${p.status}</small>` : ''}
       </div>`;
     });
   }
@@ -782,43 +990,34 @@ function showUploadComprovante(localizacaoData, descricao) {
     const reader = new FileReader();
     reader.onload = async function(e) {
       const comprovanteBase64 = e.target.result;
+      await carregarEstoque();
       
-      // Atualiza estoque e salva pedido na planilha
       cart.forEach(item => {
         const produto = products.find(p => p.id === item.id);
-        if (produto) {
+        if (produto && produto.estoque !== undefined) {
           produto.estoque -= item.qtd;
+          if (produto.estoque <= 0) { alertaEstoqueZerado(produto); }
         }
       });
       
       let codigoPedido = Math.floor(Math.random() * 900 + 100);
       let totalPedido = cart.reduce((total, item) => total + (item.preco * item.qtd), 0);
       
-      // Salva número do pedido e status nos produtos
+      // Atualiza produtos com número do pedido
       cart.forEach(item => {
         const produto = products.find(p => p.id === item.id);
         if (produto) {
-          produto.pedido = codigoPedido.toString();
+          produto.pedido = String(codigoPedido);
           produto.status = 'Pedido recebido - Aguardando confirmação do pagamento';
         }
       });
       
-      // Salva na planilha
       await salvarEstoque();
       
       let pedido = {
-        codigo: codigoPedido, 
-        produtos: [...cart], 
-        total: totalPedido, 
-        local: localizacao, 
-        mapaUrl: mapaUrl, 
-        desc: descricao || '',
-        whatsapp: whatsapp, 
-        comprovante: comprovanteBase64, 
-        comprovanteNome: selectedFile.name, 
-        comprovanteTipo: selectedFile.type,
-        data: new Date().toLocaleString('pt-BR'), 
-        status: 'Pedido recebido - Aguardando confirmação do pagamento'
+        codigo: codigoPedido, produtos: [...cart], total: totalPedido, local: localizacao, mapaUrl: mapaUrl, desc: descricao || '',
+        whatsapp: whatsapp, comprovante: comprovanteBase64, comprovanteNome: selectedFile.name, comprovanteTipo: selectedFile.type,
+        data: new Date().toLocaleString('pt-BR'), status: 'Pedido recebido - Aguardando confirmação do pagamento'
       };
       
       orders.push(pedido);
@@ -826,18 +1025,13 @@ function showUploadComprovante(localizacaoData, descricao) {
         codigo: codigoPedido, 
         msg: `Pedido #${codigoPedido} realizado - R$ ${totalPedido.toFixed(2)} - Status: Aguardando pagamento`, 
         data: pedido.data, 
+        notaFiscal: gerarNotaFiscal(pedido), 
         status: pedido.status 
       });
       
-      addNotification(); 
-      saveToStorage(); 
-      await sendTelegramNotification(pedido);
-      
-      alert(`✅ Pedido #${pedido.codigo} confirmado!\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n📱 Status será atualizado automaticamente!`);
-      
-      cart = []; 
-      saveToStorage(); 
-      showHome();
+      addNotification(); saveToStorage(); await sendTelegramNotification(pedido);
+      alert(`✅ Pedido #${pedido.codigo} confirmado!\n📱 Notificação enviada para o administrador\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n💎 Use o botão "Nota Fiscal" para baixar seus pedidos!`);
+      cart = []; saveToStorage(); showHome();
     };
     reader.onerror = function() { alert('❌ Erro ao ler o arquivo. Tente novamente.'); };
     reader.readAsDataURL(selectedFile);
@@ -849,28 +1043,70 @@ function showNotifs(){
   unreadNotifications = 0;
   updateNotificationCounter();
   saveToStorage();
-  let html = '<h3>Notificações dos Pedidos <button class="btn" onclick="verificarStatus()" style="margin-left:10px;">🔄 Verificar Status</button></h3>';
+  let html = '<h3>Notificações dos Pedidos</h3>';
+  
   if(notifications.length === 0){ 
-    html += '<p>Nenhuma notificação.</p>';
+    html += '<div class="card"><p>Nenhuma notificação.</p></div>';
   } else {
     notifications.slice().reverse().forEach(notif => {
-      const podeBaixar = notif.status && (notif.status.includes('Pagamento confirmado') || notif.status.includes('entregue'));
+      const podeBaixar = notif.status && ( notif.status.includes('Pagamento confirmado') || notif.status.includes('Entregue') );
       html += `<div class='card'>
         <b>Pedido #${notif.codigo}</b>
         <div>${notif.msg}</div>
         <small>${notif.data}</small>
         ${podeBaixar ? `<button class="btn" onclick="baixarNotaFiscalIndividual(${notif.codigo})" style="margin-top: 10px;">📄 Baixar Nota Fiscal</button>` : ''}
+        <button class="btn-ghost" onclick="verificarStatusPedido(${notif.codigo})" style="margin-top: 5px;">🔄 Verificar Status Atual</button>
       </div>`;
     });
   }
+  
+  html += `
+    <div class="card">
+      <h4>🔄 Sincronização Automática</h4>
+      <p>Os status dos pedidos são sincronizados automaticamente com a planilha.</p>
+      <button class="btn" onclick="carregarEstoque()">Sincronizar Agora</button>
+      <button class="btn-ghost" onclick="iniciarSincronizacaoAutomatica()">Ativar Sincronização Automática</button>
+    </div>
+  `;
+  
   document.getElementById('view').innerHTML = html;
 }
 
-async function verificarStatus() {
-  console.log('🔄 Verificando status da planilha...');
-  await carregarEstoque();
-  showNotifs();
-  alert('✅ Status atualizado!');
+function verificarStatusPedido(codigo) {
+  const pedido = orders.find(o => o.codigo === codigo);
+  if (!pedido) {
+    alert('Pedido não encontrado!');
+    return;
+  }
+  
+  // Verifica se há atualizações na planilha
+  carregarEstoque().then(() => {
+    const produtoRelacionado = products.find(p => p.pedido == codigo);
+    if (produtoRelacionado && produtoRelacionado.status) {
+      if (pedido.status !== produtoRelacionado.status) {
+        pedido.status = produtoRelacionado.status;
+        saveToStorage();
+        alert(`✅ Status atualizado: ${produtoRelacionado.status}`);
+        showNotifs();
+      } else {
+        alert(`ℹ️ Status atual: ${pedido.status}`);
+      }
+    } else {
+      alert('ℹ️ Nenhuma atualização encontrada na planilha.');
+    }
+  });
+}
+
+function iniciarSincronizacaoAutomatica() {
+  // Sincroniza a cada 30 segundos quando na tela de notificações
+  setInterval(() => {
+    if (currentView === 'notifs') {
+      carregarEstoque();
+      console.log('🔄 Sincronização automática executada');
+    }
+  }, 30000);
+  
+  alert('✅ Sincronização automática ativada! Atualiza a cada 30 segundos.');
 }
 
 window.showHome = showHome;
@@ -888,17 +1124,18 @@ window.goBack = goBack;
 window.showHelp = showHelp;
 window.showHelpCategory = showHelpCategory;
 window.baixarNotaFiscalIndividual = baixarNotaFiscalIndividual;
-window.verificarStatus = verificarStatus;
+window.verificarStatusPedido = verificarStatusPedido;
+window.iniciarSincronizacaoAutomatica = iniciarSincronizacaoAutomatica;
 
 async function inicializar() {
   console.log('🚀 Inicializando app...');
   await carregarEstoque();
   loadFromStorage();
   showHome();
-  console.log('✅ App inicializado!');
+  iniciarSincronizacaoAutomatica();
 }
 
 inicializar();
 </script>
 </body>
-</html>
+  </html>
