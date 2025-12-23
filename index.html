@@ -464,34 +464,7 @@ async function processarListEstoque(message) {
   });
 }
 
-async function processarReporEstoque(message) {
-  const match = message.text.match(/\/repor (\d+) (\d+)/);
-  if (!match) return;
-  
-  const id = parseInt(match[1]);
-  const quantidade = parseInt(match[2]);
-  const produto = products.find(p => p.id === id);
-  
-  if (!produto) {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ chat_id: message.chat.id, text: `❌ Produto ID ${id} não encontrado!`, parse_mode: 'Markdown' })
-    });
-    return;
-  }
-  
-  produto.estoque = quantidade;
-  const sucesso = await salvarEstoque(produto);
-  
-  if (sucesso) {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ chat_id: message.chat.id, text: `✅ Estoque de ${produto.nome} atualizado para ${quantidade} unidades!`, parse_mode: 'Markdown' })
-    });
-  }
-}
+
 
 // ⚡ INICIALIZA SINCRONIZAÇÃO AUTOMÁTICA
 function iniciarSincronizacao() {
@@ -815,13 +788,17 @@ function showHome(){
 function showCategories(){
   currentView = 'categories';
   let html = "<h3>Categorias</h3>";
+  
+  // Sempre mostra categorias, mesmo se vazias
+  categories.forEach(category => {
+    html += `<div class='category-item' onclick='showCategoryProducts("${category}")'><h4 style="margin:0">${category}</h4></div>`;
+  });
+  
+  // Se não tiver categorias, mostra mensagem discreta
   if (categories.length === 0) {
-    html += '<p>Carregando categorias...</p>';
-  } else {
-    categories.forEach(category => {
-      html += `<div class='category-item' onclick='showCategoryProducts("${category}")'><h4 style="margin:0">${category}</h4></div>`;
-    });
+    html += '<p style="color:#888; text-align:center; padding:20px;">Nenhuma categoria disponível</p>';
   }
+  
   document.getElementById('view').innerHTML = html;
 }
 
