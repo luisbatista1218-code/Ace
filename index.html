@@ -89,11 +89,11 @@ let processedCommands = new Set();
 let lastLocalizacaoData = null;
 let cartTimeout;
 
-
-        
+// ================ FUNÇÃO CORRIGIDA - CARREGAR ESTOQUE ================
 async function carregarEstoque() {
   try {
-    console.log('📡 Buscando dados da planilha... URL:', API_URL);
+    console.log('🔄 Carregando estoque da planilha...');
+    
     const response = await fetch(API_URL + '?t=' + Date.now());
     
     if (!response.ok) {
@@ -101,151 +101,92 @@ async function carregarEstoque() {
     }
     
     const data = await response.json();
-    console.log('📊 Dados recebidos (primeiros 2 registros):', data.slice(0, 2));
+    console.log('✅ Dados recebidos:', data);
     
     // Resetar arrays
     products = [];
     categories = [];
     
-    if (!data || data.length === 0) {
-      console.error('❌ Planilha vazia ou sem dados!');
-      document.getElementById('view').innerHTML = '<p>❌ Erro: Planilha vazia</p>';
+    if (!Array.isArray(data) || data.length === 0) {
+      console.warn('⚠️ Planilha vazia ou formato inválido');
+      // Mostrar mensagem na tela atual
+      if (currentView === 'categories') {
+        document.getElementById('view').innerHTML = `
+          <div class="card">
+            <h3>📦 Estoque</h3>
+            <p>Nenhum produto encontrado na planilha.</p>
+            <p><small>Adicione produtos na planilha do Google Sheets.</small></p>
+          </div>`;
+      }
       return;
     }
     
-    // Debug: mostrar estrutura da primeira linha
-    const primeiraLinha = data[0];
-    console.log('📋 Colunas disponíveis na planilha:', Object.keys(primeiraLinha));
-    
-    data.forEach((linha, index) => {
-      // Debug: linha completa
-      console.log(`📝 Linha ${index}:`, linha);
+    // Processar cada produto
+    data.forEach(item => {
+      // Converter para o formato interno
+      const produto = {
+        id: Number(item.id) || 0,
+        categoria: item.categoria || item.Categoria || 'Sem Categoria',
+        nome: item.produto || item.Produto || 'Produto sem nome',
+        descricao: item.descricao || item.descrição || item.Descrição || '',
+        preco: parseFloat(
+          String(item.preço || item.preco || '0')
+            .replace('R$', '')
+            .replace(',', '.')
+            .trim()
+        ) || 0,
+        estoque: Number(item.estoque || item.Estoque || 0),
+        imagem: item.imagem_url || item.imagem || item.Imagem_url || 
+                `https://via.placeholder.com/400x200?text=${encodeURIComponent(item.produto || 'Produto')}`,
+        pedido: item.pedido || item.Pedido || '',
+        status: item.status || item.Status || ''
+      };
       
-      // **CORREÇÃO CRÍTICA:** Buscar os valores pelos nomes CORRETOS das colunas
-      const id = Number(
-        linha.id || 
-        linha.ID || 
-        linha.Id || 
-        linha['ID'] ||  // Tentar com aspas
-        0
-      );
-      
-      const categoria = 
-        linha.categoria || 
-        linha.Categoria || 
-        linha['Categoria'] || 
-        linha['categoria '] ||  // Com espaço
-        'Sem Categoria';
-      
-      const nome = 
-        linha.produto || 
-        linha.Produto || 
-        linha['Produto'] || 
-        linha.nome || 
-        'Produto sem nome';
-      
-      // Processar preço
-      let precoValor = 0;
-      const precoRaw = 
-        linha.preco || 
-        linha.Preço || 
-        linha.preço || 
-        linha['Preço'] || 
-        linha.valor || 
-        '0';
-      
-      if (precoRaw && precoRaw !== '' && precoRaw !== '0') {
-        const precoStr = String(precoRaw)
-          .replace('R$', '')
-          .replace(',', '.')
-          .replace(/\s/g, '')
-          .trim();
-        precoValor = parseFloat(precoStr) || 0;
-        
-        if (isNaN(precoValor)) {
-          console.warn(`⚠️ Preço inválido na linha ${index}: "${precoRaw}"`);
-          precoValor = 0;
-        }
-      }
-      
-      const estoque = Number(
-        linha.estoque || 
-        linha.Estoque || 
-        linha['Estoque'] || 
-        linha.quantidade || 
-        0
-      );
-      
-      const descricao = 
-        linha.descricao || 
-        linha.descrição || 
-        linha.Descrição || 
-        linha['Descrição'] || 
-        '';
-      
-      const imagem = 
-        linha.imagem || 
-        linha.Imagem_url || 
-        linha.imagem_url || 
-        linha['Imagem_url'] || 
-        linha.Imagem || 
-        `https://via.placeholder.com/400x200?text=${encodeURIComponent(nome)}`;
-      
-      // **ADICIONAR: Pedido e Status (agora existem na planilha)**
-      const pedido = linha.pedido || linha.Pedido || linha['Pedido'] || '';
-      const status = linha.status || linha.Status || linha['Status'] || '';
-      
-      // Filtrar produtos válidos
-      if (id > 0 && nome && nome !== 'Produto sem nome') {
-        const produto = {
-          id: id,
-          categoria: categoria,
-          nome: nome,
-          descricao: descricao,
-          preco: precoValor,
-          estoque: estoque,
-          imagem: imagem,
-          pedido: pedido,      // Novo campo
-          status: status       // Novo campo
-        };
-        
+      if (produto.id > 0 && produto.nome !== 'Produto sem nome') {
         products.push(produto);
         
-        // Adicionar categoria à lista (evitar duplicatas)
-        if (categoria && categoria !== 'Sem Categoria' && !categories.includes(categoria)) {
-          categories.push(categoria);
+        // Adicionar categoria se não existir
+        if (produto.categoria && produto.categoria !== 'Sem Categoria' && 
+            !categories.includes(produto.categoria)) {
+          categories.push(produto.categoria);
         }
-        
-        console.log(`✅ Produto ${index}: ${nome} (${categoria}) - R$ ${precoValor}`);
-      } else {
-        console.warn(`⚠️ Linha ${index} ignorada: ID=${id}, Nome="${nome}"`);
       }
     });
-
-    console.log('🎉 Carregamento concluído!');
-    console.log('📦 Total de produtos:', products.length);
-    console.log('🏷️ Categorias encontradas:', categories);
     
-    // Atualizar interface se estiver na tela de categorias
-    if (currentView === 'categories' || currentView === 'category-products') {
-      showCategories();
+    console.log(`📦 Produtos carregados: ${products.length}`);
+    console.log(`🏷️ Categorias: ${categories.join(', ')}`);
+    
+    // ATUALIZAÇÃO AUTOMÁTICA DA TELA
+    if (currentView === 'categories') {
+      showCategories(); // Atualiza a tela com as categorias carregadas
+    } else if (currentView === 'category-products') {
+      // Se estiver vendo produtos de uma categoria, mantém na mesma tela
+      const activeCategory = document.querySelector('.card h3')?.textContent?.replace('Categoria: ', '');
+      if (activeCategory) {
+        showCategoryProducts(activeCategory);
+      }
     }
+    
+    return true;
     
   } catch (error) {
     console.error('❌ Erro ao carregar planilha:', error);
     
-    // Mostrar erro para o usuário
+    // Mostrar erro na tela atual
     if (currentView === 'categories') {
       document.getElementById('view').innerHTML = `
         <div class="card">
-          <h3>❌ Erro ao carregar categorias</h3>
-          <p>Erro: ${error.message}</p>
-          <button class="btn" onclick="carregarEstoque()">🔄 Tentar Novamente</button>
+          <h3>❌ Erro ao carregar</h3>
+          <p>Não foi possível carregar os dados da planilha.</p>
+          <p><small>Erro: ${error.message}</small></p>
         </div>`;
     }
+    
+    return false;
   }
 }
-  
+// ================ FIM DA FUNÇÃO CORRIGIDA ================
+
 async function salvarEstoque() {
   try {
     const dados = {
@@ -256,7 +197,9 @@ async function salvarEstoque() {
         preço: String(p.preco || 0),
         estoque: String(p.estoque || 0),
         imagem: p.imagem || '',
-        descrição: p.descricao || ''
+        descrição: p.descricao || '',
+        pedido: p.pedido || '',
+        status: p.status || ''
       }))
     };
 
@@ -293,7 +236,9 @@ async function salvarEstoque() {
           preço: String(p.preco || 0),
           estoque: String(p.estoque || 0),
           imagem: p.imagem || '',
-          descrição: p.descricao || ''
+          descrição: p.descricao || '',
+          pedido: p.pedido || '',
+          status: p.status || ''
         }))
       }));
       return true;
@@ -877,22 +822,49 @@ function showHome(){
     </div>`;
 }
 
-function showCategories(){
+// ================ FUNÇÃO CORRIGIDA - SHOW CATEGORIES ================
+function showCategories() {
   currentView = 'categories';
+  
   let html = "<h3>Categorias</h3>";
   
+  console.log('🔍 Mostrando categorias. Produtos:', products.length, 'Categorias:', categories.length);
+  
   if (categories.length === 0) {
-    html += '<p>Carregando categorias...</p>';
-  } else {
-    categories.forEach(category => {
-      html += `<div class='category-item' onclick='showCategoryProducts("${category}")'>
-        <h4 style="margin:0">${category}</h4>
-      </div>`;
-    });
+    // Se não tem categorias, mostra loading e CARREGA automaticamente
+    html = '<div class="loading">🔄 Carregando categorias...</div>';
+    document.getElementById('view').innerHTML = html;
+    
+    // Carrega estoque automaticamente e depois atualiza a tela
+    setTimeout(async () => {
+      await carregarEstoque();
+      
+      // Depois de carregar, mostra as categorias
+      if (categories.length > 0) {
+        showCategories(); // Chama a si mesma para mostrar as categorias
+      } else {
+        document.getElementById('view').innerHTML = `
+          <div class="card">
+            <h3>Categorias</h3>
+            <p>Nenhuma categoria encontrada.</p>
+            <button class="btn" onclick="carregarEstoque()">🔄 Tentar Novamente</button>
+          </div>`;
+      }
+    }, 100);
+    
+    return;
   }
+  
+  // Se tem categorias, mostra elas
+  categories.forEach(category => {
+    html += `<div class='category-item' onclick='showCategoryProducts("${category}")'>
+      <h4 style="margin:0">${category}</h4>
+    </div>`;
+  });
   
   document.getElementById('view').innerHTML = html;
 }
+// ================ FIM DA FUNÇÃO CORRIGIDA ================
 
 function showCategoryProducts(categoryName){
   currentView = 'category-products';
@@ -1406,7 +1378,8 @@ window.showHelpCategory = showHelpCategory;
 window.baixarNotaFiscalIndividual = baixarNotaFiscalIndividual;
 
 async function inicializar() {
-  await carregarEstoque();
+  console.log('🚀 Inicializando app...');
+  await carregarEstoque(); // Carrega estoque AO INICIAR
   loadFromStorage();
   showHome();
   
