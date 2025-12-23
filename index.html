@@ -58,7 +58,7 @@
 
 <div class="nav">
   <button onclick="showHome()">Início</button>
-  <button onclick="showCategory()">Categoria</button> <!-- CORRIGIDO: categoria -->
+  <button onclick="showCategories()">Categoria</button>
   <button onclick="showCart()">Carrinho</button>
   <button id="notifBtn" class="notification-btn" onclick="showNotifs()">
     Notificações
@@ -87,11 +87,22 @@ let messageIds = {};
 let processedCommands = new Set();
 let lastLocalizacaoData = null;
 let cartTimeout;
-let statusCheckInterval;
+let statusCheckInterval = null;
+let carregamentoEmAndamento = false;
 
 async function carregarEstoque() {
+  if (carregamentoEmAndamento) return;
+  
   try {
-    const response = await fetch(API_URL);
+    carregamentoEmAndamento = true;
+    
+    // Timeout de 10 segundos máximo
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    const response = await fetch(API_URL, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
     const data = await response.json();
     console.log('📊 Dados BRUTOS da planilha (primeira linha):', data[0]);
 
@@ -129,7 +140,7 @@ async function carregarEstoque() {
           status: status
         };
         
-        console.log(`✅ Produto ${id}: "${nome}" | Preço: ${precoValor} | Pedido: ${pedido} | Status: ${status}`);
+        console.log(`✅ Produto ${id}: "${nome}" | Preço: ${precoValor} | Status: ${status}`);
         products.push(produto);
         
         if (!categories.includes(categoria)) {
@@ -141,11 +152,54 @@ async function carregarEstoque() {
     console.log('✅ Total de produtos carregados:', products.length);
     console.log('✅ Categorias:', categories);
 
-    if (currentView === 'category' || currentView === 'category-products') {
-      showCategory();
+    // Atualiza status dos pedidos baseado na planilha
+    atualizarStatusPedidosDaPlanilha();
+    
+    if (currentView === 'categories' || currentView === 'category-products') {
+      showCategories();
     }
   } catch (error) {
     console.error('❌ Erro ao carregar planilha:', error);
+  } finally {
+    carregamentoEmAndamento = false;
+  }
+}
+
+function atualizarStatusPedidosDaPlanilha() {
+  // Procura produtos com pedido e status na planilha
+  products.forEach(produto => {
+    if (produto.pedido && produto.status) {
+      const codigoPedido = parseInt(produto.pedido);
+      const pedido = orders.find(o => o.codigo === codigoPedido);
+      
+      if (pedido && pedido.status !== produto.status) {
+        // Atualiza status do pedido
+        pedido.status = produto.status;
+        
+        // Adiciona notificação se não existir
+        const notificacaoExistente = notifications.find(n => 
+          n.codigo === codigoPedido && n.status === produto.status
+        );
+        
+        if (!notificacaoExistente) {
+          notifications.push({
+            codigo: codigoPedido,
+            msg: `🔄 Pedido #${codigoPedido} atualizado: ${produto.status}`,
+            data: new Date().toLocaleString('pt-BR'),
+            notaFiscal: gerarNotaFiscal(pedido),
+            status: produto.status
+          });
+          addNotification();
+        }
+        
+        console.log(`📋 Status atualizado do pedido #${codigoPedido}: ${produto.status}`);
+      }
+    }
+  });
+  
+  saveToStorage();
+  if (currentView === 'notifs') {
+    showNotifs();
   }
 }
   
@@ -160,8 +214,8 @@ async function salvarEstoque() {
         estoque: String(p.estoque || 0),
         imagem: p.imagem || '',
         descrição: p.descricao || '',
-        pedido: p.pedido || '',
-        status: p.status || ''
+        pedido: p.pedido || '',      // ⬅️ NOVA COLUNA
+        status: p.status || ''       // ⬅️ NOVA COLUNA
       }))
     };
 
@@ -200,8 +254,8 @@ async function salvarEstoque() {
           estoque: String(p.estoque || 0),
           imagem: p.imagem || '',
           descrição: p.descricao || '',
-          pedido: p.pedido || '',
-          status: p.status || ''
+          pedido: p.pedido || '',    // ⬅️ NOVA COLUNA
+          status: p.status || ''     // ⬅️ NOVA COLUNA
         }))
       }));
       return true;
@@ -233,6 +287,7 @@ async function checkTelegramUpdates() {
       data.result.forEach(update => {
         if (update.message && update.message.text) {
           const text = update.message.text;
+          if (text.startsWith('/repor')) { processarReporEstoque(update.message); }
           if (text.startsWith('/list')) { processarListEstoque(update.message); }
         }  
         if (update.callback_query) {
@@ -286,20 +341,7 @@ async function processarCallbackStatus(data, callbackObj) {
   if (novoStatus === 'entregue' || novoStatus === 'cancelado') {
     pedidosBloqueados.add(chave);
   }
-
-  // Atualiza status na planilha
-  const pedido = orders.find(o => o.codigo === codigo);
-  if (pedido) {
-    // Encontra o produto correspondente na planilha
-    const produtoIndex = products.findIndex(p => p.pedido === String(codigo));
-    if (produtoIndex !== -1) {
-      products[produtoIndex].status = textoStatus;
-      await salvarEstoque();
-    }
-  }
-
   atualizarStatusPedido(codigo, textoStatus);
-  
   if (callbackObj?.id) {
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
       method: 'POST',
@@ -311,18 +353,6 @@ async function processarCallbackStatus(data, callbackObj) {
       })
     });
   }
-  
-  // Envia nova mensagem no Telegram
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      chat_id: CHAT_ID,
-      text: `🔄 Pedido #${codigo} atualizado: ${textoStatus}`,
-      parse_mode: 'Markdown'
-    })
-  });
-
   console.log(`Status de ${codigo} atualizado para: ${textoStatus}`);
 }
 
@@ -342,11 +372,36 @@ function atualizarStatusPedido(codigo, novoStatus) {
       addNotification();
     }
     saveToStorage();
-    
-    if (currentView === 'notifs') {
-      showNotifs();
-    }
+    if (messageIds[codigo]) { atualizarMensagemTelegram(codigo, pedido); }
+    if (currentView === 'notifs') { showNotifs(); }
   }
+}
+
+async function atualizarMensagemTelegram(codigo, pedido) {
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [ { text: "✅ Pago", callback_data: `status_${codigo}_pago` }, { text: "👨‍🍳 Preparando", callback_data: `status_${codigo}_preparando` } ],
+      [ { text: "🚚 Entrega", callback_data: `status_${codigo}_entrega` }, { text: "🎉 Entregue", callback_data: `status_${codigo}_entregue` } ],
+      [ { text: "❌ Cancelar", callback_data: `status_${codigo}_cancelado` } ]
+    ]
+  };
+  const message = `📦 *PEDIDO #${pedido.codigo}* - ${pedido.status}\n\n💰 *Total:* R$ ${pedido.total.toFixed(2)}\n📍 *Endereço:* ${pedido.local}\n📱 *Telefone:* ${pedido.whatsapp}\n📋 *Itens:* ${pedido.produtos.map(p => `${p.nome} (x${p.qtd})`).join(', ')}\n⏰ *Data:* ${pedido.data}`;
+  try {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        message_id: messageIds[codigo],
+        text: message,
+        parse_mode: 'Markdown',
+        reply_markup: inlineKeyboard
+      })
+    });
+    const result = await response.json();
+    if (!result.ok) { console.error('Erro ao atualizar mensagem:', result); }
+  } catch (error) { console.error('Erro ao atualizar mensagem:', error); }
 }
 
 async function alertaEstoqueZerado(produto) {
@@ -366,6 +421,31 @@ async function processarListEstoque(message) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: message.chat.id, text: estoqueMsg, parse_mode: 'Markdown' })
   });
+}
+
+async function processarReporEstoque(message) {
+  const match = message.text.match(/\/repor (\d+) (\d+)/);
+  if (!match) return;
+  const id = parseInt(match[1]);
+  const quantidade = parseInt(match[2]);
+  const produto = products.find(p => p.id === id);
+  if (!produto) {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ chat_id: message.chat.id, text: `❌ Produto ID ${id} não encontrado!`, parse_mode: 'Markdown' })
+    });
+    return;
+  }
+  produto.estoque = quantidade;
+  const sucesso = await salvarEstoque();
+  if (sucesso) {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ chat_id: message.chat.id, text: `✅ Estoque de ${produto.nome} atualizado para ${quantidade} unidades!`, parse_mode: 'Markdown' })
+    });
+  }
 }
 
 setInterval(checkTelegramUpdates, 2000);
@@ -435,7 +515,7 @@ function showHelp(){
     <div class='card'>
       <h3>📚 Central de Ajuda</h3>
       <p>Escolha uma categoria para ver as instruções:</p>
-      <div class='category-item' onclick='showHelpCategory("categorias")'><h4 style='margin:0'>🏷️ Como usar Categoria</h4></div>
+      <div class='category-item' onclick='showHelpCategory("categorias")'><h4 style='margin:0'>🏷️ Como usar Categorias</h4></div>
       <div class='category-item' onclick='showHelpCategory("carrinho")'><h4 style='margin:0'>🛒 Como usar o Carrinho</h4></div>
       <div class='category-item' onclick='showHelpCategory("notificacoes")'><h4 style='margin:0'>📱 Notificações e Pedidos</h4></div>
       <div class='category-item' onclick='showHelpCategory("pagamento")'><h4 style='margin:0'>💳 Processo de Pagamento</h4></div>
@@ -447,7 +527,7 @@ function showHelp(){
 function showHelpCategory(categoria){
   currentView = 'help-category';
   const conteudos = {
-    categorias: { titulo: "🏷️ Como usar Categoria", texto: `1. <strong>Navegação</strong>: Toque em "Categoria" no menu inferior para ver todas as categorias disponíveis.<br><br>2. <strong>Seleção</strong>: Escolha uma categoria como "Pizza", "Bebidas" ou "Sobremesas".<br><br>3. <strong>Produtos</strong>: Dentro de cada categoria, você verá todos os produtos disponíveis com foto, descrição e preço.<br><br>4. <strong>Adicionar</strong>: Toque em "Adicionar ao Carrinho" para incluir o produto no seu pedido.` },
+    categorias: { titulo: "🏷️ Como usar Categorias", texto: `1. <strong>Navegação</strong>: Toque em "Categoria" no menu inferior para ver todas as categorias disponíveis.<br><br>2. <strong>Seleção</strong>: Escolha uma categoria como "Pizza", "Bebidas" ou "Sobremesas".<br><br>3. <strong>Produtos</strong>: Dentro de cada categoria, você verá todos os produtos disponíveis com foto, descrição e preço.<br><br>4. <strong>Adicionar</strong>: Toque em "Adicionar ao Carrinho" para incluir o produto no seu pedido.` },
     carrinho: { titulo: "🛒 Como usar o Carrinho", texto: `1. <strong>Acesso</strong>: Toque em "Carrinho" no menu inferior para ver seus itens.<br><br>2. <strong>Quantidade</strong>: Use os botões "+" e "-" para ajustar as quantidades.<br><br>3. <strong>Remover</strong>: Diminua a quantidade para zero para remover um item.<br><br>4. <strong>Finalizar</strong>: Toque em "Finalizar Pedido" quando estiver pronto para pagar.<br><br>5. <strong>Limpar</strong>: Use "Limpar Carrinho" para remover todos os itens.` },
     notificacoes: { titulo: "📱 Notificações e Pedidos", texto: `1. <strong>Acompanhamento</strong>: Toque em "Notificações" para ver o status dos seus pedidos.<br><br>2. <strong>Status</strong>: Acompanhe cada etapa: recebido, em preparo, saiu para entrega, entregue.<br><br>3. <strong>Nota Fiscal</strong>: Pedidos com pagamento confirmado permitem baixar a nota fiscal.<br><br>4. <strong>Badge</strong>: O número vermelho indica novas notificações não lidas.` },
     pagamento: { titulo: "💳 Processo de Pagamento", texto: `1. <strong>Localização</strong>: O app detecta automaticamente seu endereço via GPS.<br><br>2. <strong>Dados</strong>: Confirme ou edite o endereço e informe seu telefone.<br><br>3. <strong>PIX</strong>: Você receberá a chave PIX e valor exato para pagamento.<br><br>4. <strong>Comprovante</strong>: Envie foto ou PDF do comprovante pelo próprio app.<br><br>5. <strong>Confirmação</strong>: Após análise, seu pedido será confirmado.` },
@@ -518,7 +598,7 @@ function gerarNotaFiscal(pedido) {
     cliente: { telefone: pedido.whatsapp, endereco: pedido.local },
     itens: pedido.produtos.map(item => ({ nome: item.nome, quantidade: item.qtd, preco_unitario: item.preco, subtotal: item.preco * item.qtd })),
     totais: { subtotal: pedido.produtos.reduce((sum, item) => sum + (item.preco * item.qtd), 0), total: pedido.total },
-    status: "Pagamento confirmado",
+    status: pedido.status || "Pagamento confirmado",
     comprovante: pedido.comprovante ? "Enviado" : "Não enviado"
   };
 }
@@ -536,7 +616,7 @@ function baixarNotaFiscalIndividual(codigo) {
       <div style="margin-bottom: 15px;">
         <p><strong>Pedido:</strong> #${pedido.codigo}</p>
         <p><strong>Data:</strong> ${pedido.data}</p>
-        <p><strong>Status:</strong> Pagamento confirmado</p>
+        <p><strong>Status:</strong> ${pedido.status || 'Pagamento confirmado'}</p>
       </div>
       <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
         <thead>
@@ -586,8 +666,8 @@ function goBack(){
     return;
   }
   if(currentView === 'dados-entrega') { showCart(); return; }
-  else if(currentView === 'category' || currentView === 'category-products' || currentView === 'cart' || currentView === 'notifs'){ showHome(); }
-  else if(currentView === 'product-list'){ showCategory(); }
+  else if(currentView === 'categories' || currentView === 'category-products' || currentView === 'cart' || currentView === 'notifs'){ showHome(); }
+  else if(currentView === 'product-list'){ showCategories(); }
 }
 
 function openContact(){ 
@@ -605,14 +685,20 @@ function showHome(){
     </div>`;
 }
 
-function showCategory(){
-  currentView = 'category';
-  let html = "<h3>Categoria</h3>";
-  if (categorie.length === 0) {
-    html += '<p>Carregando categoria...</p>';
+function showCategories(){
+  currentView = 'categories';
+  let html = "<h3>Categorias</h3>";
+  if (categories.length === 0) {
+    html += '<p>Carregando categorias...</p>';
+    // Tenta carregar se estiver vazio
+    if (!carregamentoEmAndamento) {
+      carregarEstoque();
+    }
   } else {
     categories.forEach(category => {
-      html += `<div class='category-item' onclick='showCategoryProducts("${category}")'><h4 style="margin:0">${category}</h4></div>`;
+      // Escapa aspas para evitar erro no JavaScript
+      const safeCategory = (category || '').replace(/"/g, '\\"').replace(/'/g, "\\'");
+      html += `<div class='category-item' onclick='showCategoryProducts("${safeCategory}")'><h4 style="margin:0">${category}</h4></div>`;
     });
   }
   document.getElementById('view').innerHTML = html;
@@ -640,7 +726,7 @@ function showCategoryProducts(categoryName){
       </div>`;
     });
   }
-  html += `<button class="btn-ghost" onclick="showCategory()" style="margin-top: 15px;">← Voltar para Categorias</button>`;
+  html += `<button class="btn-ghost" onclick="showCategories()" style="margin-top: 15px;">← Voltar para Categorias</button>`;
   document.getElementById('view').innerHTML = html;
 }
 
@@ -682,7 +768,7 @@ function showCart(){
           <button onclick='startCheckout()' class="btn" style="width: 100%; padding: 15px; font-size: 18px;">✅ Finalizar Pedido</button>
         </div>
         <button onclick='clearCart()' class="btn-ghost">Limpar Carrinho</button>
-        <button onclick='showCategory()' class="btn-ghost">← Voltar Categorias</button>
+        <button onclick='showCategories()' class="btn-ghost">← Voltar Categorias</button>
       </div>`;
   }
   document.getElementById('view').innerHTML = html;
@@ -850,36 +936,39 @@ function showUploadComprovante(localizacaoData, descricao) {
       const comprovanteBase64 = e.target.result;
       await carregarEstoque();
       
-      // Atribui número do pedido e status inicial
-      const codigoPedido = Math.floor(Math.random() * 900 + 100);
+      // Gera código do pedido
+      let codigoPedido = Math.floor(Math.random() * 900 + 100);
+      let totalPedido = cart.reduce((total, item) => total + (item.preco * item.qtd), 0);
       
+      // Atualiza estoque e salva pedido/status na planilha
       cart.forEach(item => {
         const produto = products.find(p => p.id === item.id);
         if (produto && produto.estoque !== undefined) {
           produto.estoque -= item.qtd;
-          produto.pedido = String(codigoPedido);
-          produto.status = 'Aguardando pagamento';
+          produto.pedido = codigoPedido; // Salva número do pedido
+          produto.status = 'Pedido recebido - Aguardando confirmação do pagamento'; // Status inicial
           
           if (produto.estoque <= 0) { alertaEstoqueZerado(produto); }
         }
       });
       
+      // Salva tudo na planilha
       await salvarEstoque();
       
-      let totalPedido = cart.reduce((total, item) => total + (item.preco * item.qtd), 0);
+      // Cria o pedido local
       let pedido = {
-        codigo: codigoPedido,
-        produtos: [...cart],
-        total: totalPedido,
-        local: localizacao,
-        mapaUrl: mapaUrl,
+        codigo: codigoPedido, 
+        produtos: [...cart], 
+        total: totalPedido, 
+        local: localizacao, 
+        mapaUrl: mapaUrl, 
         desc: descricao || '',
-        whatsapp: whatsapp,
-        comprovante: comprovanteBase64,
-        comprovanteNome: selectedFile.name,
+        whatsapp: whatsapp, 
+        comprovante: comprovanteBase64, 
+        comprovanteNome: selectedFile.name, 
         comprovanteTipo: selectedFile.type,
-        data: new Date().toLocaleString('pt-BR'),
-        status: 'Aguardando pagamento'
+        data: new Date().toLocaleString('pt-BR'), 
+        status: 'Pedido recebido - Aguardando confirmação do pagamento'
       };
       
       orders.push(pedido);
@@ -895,8 +984,8 @@ function showUploadComprovante(localizacaoData, descricao) {
       saveToStorage(); 
       await sendTelegramNotification(pedido);
       
-      alert(`✅ Pedido #${pedido.codigo} confirmado!\n📱 Notificação enviada para o administrador\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n💎 Use o botão "Nota Fiscal" para baixar seus pedidos!`);
-
+      alert(`✅ Pedido #${pedido.codigo} confirmado!\n📱 Notificação enviada para o administrador\n💰 Total: R$ ${totalPedido.toFixed(2)}\n📍 Entrega em: ${localizacao}\n\n💎 Status será atualizado automaticamente!`);
+      
       cart = []; 
       saveToStorage(); 
       showHome();
@@ -911,12 +1000,12 @@ function showNotifs(){
   unreadNotifications = 0;
   updateNotificationCounter();
   saveToStorage();
-  let html = '<h3>Notificações dos Pedidos <button class="btn" onclick="verificarStatusPedidos()" style="margin-left:10px;">🔄 Verificar Status</button></h3>';
+  let html = '<h3>Notificações dos Pedidos <button class="btn" onclick="verificarStatusAutomatico()" style="margin-left:10px;">🔄 Verificar Status</button></h3>';
   if(notifications.length === 0){ 
     html += '<p>Nenhuma notificação.</p>';
   } else {
     notifications.slice().reverse().forEach(notif => {
-      const podeBaixar = notif.status && ( notif.status.includes('Pagamento confirmado') );
+      const podeBaixar = notif.status && ( notif.status.includes('Pagamento confirmado') || notif.status.includes('entregue') );
       html += `<div class='card'>
         <b>Pedido #${notif.codigo}</b>
         <div>${notif.msg}</div>
@@ -928,51 +1017,29 @@ function showNotifs(){
   document.getElementById('view').innerHTML = html;
 }
 
-// ⚡ NOVA FUNÇÃO: Verifica status na planilha a cada 3 segundos
-async function verificarStatusPedidos() {
-  console.log('🔄 Verificando status na planilha...');
-  await carregarEstoque();
+async function verificarStatusAutomatico() {
+  console.log('🔄 Verificando status dos pedidos...');
+  await carregarEstoque(); // Isso já atualiza os status da planilha
   
-  let atualizou = false;
-  
-  // Verifica cada pedido local
-  orders.forEach(pedidoLocal => {
-    // Procura produto com mesmo número de pedido na planilha
-    const produtoPlanilha = products.find(p => p.pedido === String(pedidoLocal.codigo));
-    
-    if (produtoPlanilha && produtoPlanilha.status && pedidoLocal.status !== produtoPlanilha.status) {
-      // Status mudou na planilha!
-      pedidoLocal.status = produtoPlanilha.status;
-      
-      // Atualiza notificação
-      const notif = notifications.find(n => n.codigo === pedidoLocal.codigo);
-      if (notif) {
-        notif.msg = `Pedido #${pedidoLocal.codigo} - R$ ${pedidoLocal.total.toFixed(2)} - Status: ${produtoPlanilha.status}`;
-        notif.status = produtoPlanilha.status;
-      }
-      
-      atualizou = true;
-      console.log(`✅ Pedido #${pedidoLocal.codigo} atualizado: ${produtoPlanilha.status}`);
-    }
-  });
-  
-  if (atualizou) {
-    saveToStorage();
-    if (currentView === 'notifs') {
-      showNotifs();
-    }
-    alert('✅ Status dos pedidos atualizado da planilha!');
+  // Força atualização da tela
+  if (currentView === 'notifs') {
+    showNotifs();
+    alert('✅ Status atualizado da planilha!');
   }
 }
 
-// Inicia verificação automática a cada 3 segundos
-function iniciarVerificacaoStatus() {
+function iniciarVerificacaoAutomatica() {
   if (statusCheckInterval) clearInterval(statusCheckInterval);
-  statusCheckInterval = setInterval(verificarStatusPedidos, 3000);
+  // Verifica a cada 30 segundos (30000ms)
+  statusCheckInterval = setInterval(() => {
+    if (currentView === 'notifs') {
+      verificarStatusAutomatico();
+    }
+  }, 30000); // 30 segundos
 }
 
 window.showHome = showHome;
-window.showCategory = showCategory;
+window.showCategories = showCategories;
 window.showCategoryProducts = showCategoryProducts;
 window.showCart = showCart;
 window.showNotifs = showNotifs;
@@ -986,16 +1053,16 @@ window.goBack = goBack;
 window.showHelp = showHelp;
 window.showHelpCategory = showHelpCategory;
 window.baixarNotaFiscalIndividual = baixarNotaFiscalIndividual;
-window.verificarStatusPedidos = verificarStatusPedidos;
+window.verificarStatusAutomatico = verificarStatusAutomatico;
 
 async function inicializar() {
   await carregarEstoque();
   loadFromStorage();
   showHome();
-  iniciarVerificacaoStatus(); // ⚡ Inicia verificação automática
+  iniciarVerificacaoAutomatica();
 }
 
 inicializar();
 </script>
 </body>
-  </html>
+</html>
