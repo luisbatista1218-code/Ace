@@ -2158,19 +2158,19 @@ async function carregarAgendaCliente() {
           </div>
           
 <!-- STATUS E CÓDIGO ALINHADOS CORRETAMENTE -->
-<div style="display: flex; justify-content: space-between; align-items: flex-start; padding-top: 16px; border-top: 1px solid var(--border);">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; padding-top: 16px; border-top: 1px solid var(--border); width: 100%;">
   
   <!-- LADO ESQUERDO: Status em cima, Confirmado embaixo -->
-  <div style="display: flex; flex-direction: column;">
-    <span style="font-size: 12px; color: var(--muted); margin-bottom: 4px;">Status</span>
-    <span style="background: rgba(79,142,247,.15); padding: 6px 16px; border-radius: 100px; font-size: 12px; font-weight: 600; color: var(--accent);">
+  <div style="display: flex; flex-direction: column; width: auto;">
+    <span style="font-size: 12px; color: var(--muted); margin-bottom: 6px;">Status</span>
+    <span style="background: rgba(79,142,247,.15); padding: 6px 16px; border-radius: 100px; font-size: 12px; font-weight: 600; color: var(--accent); display: inline-block;">
       🟡 Confirmado
     </span>
   </div>
   
   <!-- LADO DIREITO: Código em cima, número embaixo (ambos à direita) -->
   <div style="display: flex; flex-direction: column; align-items: flex-end;">
-    <span style="font-size: 12px; color: var(--muted); margin-bottom: 4px;">Código</span>
+    <span style="font-size: 12px; color: var(--muted); margin-bottom: 6px;">Código</span>
     <span style="font-family: 'Courier New', monospace; font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 2px; background: rgba(79,142,247,.15); padding: 4px 12px; border-radius: 8px;">
       ${ag.codigo}
     </span>
