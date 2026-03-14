@@ -2089,8 +2089,121 @@ localStorage.setItem('todos_comprovantes', JSON.stringify(comprovantes));
   }
 }
 
-
 async function carregarAgendaCliente() {
+  const container = document.getElementById('listaAgendaCliente');
+  if (!container) return;
+  
+  container.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
+  
+  try {
+    // 1️⃣ PEGAR TELEFONE DO LOCALSTORAGE
+    const telefone = localStorage.getItem('cliente_telefone');
+    
+    if (!telefone) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          📱<br>
+          <h3>Telefone não encontrado</h3>
+          <p>Faça um agendamento primeiro</p>
+          <button class="btn-admin" onclick="mostrarCalendario()">Agendar</button>
+        </div>
+      `;
+      return;
+    }
+
+    // 2️⃣ LIMPAR TELEFONE (só números)
+    const telefoneLimpo = telefone.replace(/\D/g, '');
+    
+    console.log('🔍 Buscando agendamentos para telefone:', telefoneLimpo);
+
+    // 3️⃣ BUSCAR AGENDAMENTOS SOMENTE DA TABELA AGENDA
+    const agendamentos = await fetchSupabase(
+      `agenda?telefone=eq.${telefoneLimpo}&order=data_agendamento.desc,horario.desc`
+    );
+
+    console.log('📋 Agendamentos encontrados:', agendamentos);
+
+    // 4️⃣ SE NÃO ENCONTROU NADA
+    if (!agendamentos || agendamentos.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+          📅<br>
+          <h3>Nenhum agendamento encontrado</h3>
+          <p>Telefone: ${telefoneLimpo}</p>
+          <button class="btn-admin" onclick="mostrarCalendario()">Agendar agora</button>
+        </div>
+      `;
+      return;
+    }
+
+    // 5️⃣ CARREGAR SERVIÇOS (para pegar nomes)
+    await carregarServicos();
+
+    // 6️⃣ MONTAR HTML
+    let html = `<p style="margin-bottom: 20px;">📱 Telefone: <strong>${telefoneLimpo}</strong></p>`;
+    
+    for (const ag of agendamentos) {
+      // Buscar serviço
+      const servico = servicos.find(s => s.id === ag.servico_id);
+      if (!servico) continue;
+      
+      // Formatar data
+      const [ano, mes, dia] = ag.data_agendamento.split('-');
+      const dataFormatada = `${dia}/${mes}/${ano}`;
+      
+      html += `
+        <div style="background: var(--card); border-radius: 10px; padding: 20px; margin-bottom: 15px; border-left: 5px solid var(--accent);">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div>
+              <strong style="color: var(--muted);">Data:</strong><br>
+              <span>${dataFormatada}</span>
+            </div>
+            <div>
+              <strong style="color: var(--muted);">Horário:</strong><br>
+              <span>${ag.horario.substring(0,5)}</span>
+            </div>
+            <div>
+              <strong style="color: var(--muted);">Serviço:</strong><br>
+              <span>${servico.nome}</span>
+            </div>
+            <div>
+              <strong style="color: var(--muted);">Profissional:</strong><br>
+              <span>${servico.profissional}</span>
+            </div>
+            <div>
+              <strong style="color: var(--muted);">Valor:</strong><br>
+              <span>R$ ${parseFloat(ag.valor).toFixed(2)}</span>
+            </div>
+            <div>
+              <strong style="color: var(--muted);">Status:</strong><br>
+              <span style="color: ${ag.status === 'concluido' ? 'var(--green)' : 'var(--accent)'};">${ag.status}</span>
+            </div>
+            <div style="grid-column: 1/-1;">
+              <strong style="color: var(--muted);">Código:</strong><br>
+              <span style="font-family: monospace; font-size: 18px; color: var(--accent);">${ag.codigo_confirmacao}</span>
+            </div>
+          </div>
+          ${ag.status !== 'concluido' ? `
+            <button onclick="abrirModalExclusao('${ag.id}', 'cliente')" style="margin-top: 15px; background: var(--red); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer;">
+              Cancelar agendamento
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    container.innerHTML = html;
+
+  } catch (error) {
+    console.error('❌ ERRO COMPLETO:', error);
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: var(--red);">
+        ⚠️ Erro: ${error.message}
+      </div>
+    `;
+  }
+}
+/*async function carregarAgendaCliente() {
   const container = document.getElementById('listaAgendaCliente');
   container.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
   
@@ -2198,7 +2311,7 @@ async function carregarAgendaCliente() {
       </div>
     `;
   }
-}
+}*/
                      
 async function apagarAgendamentoIndividual(agendamentoId, origem) {
   try {
