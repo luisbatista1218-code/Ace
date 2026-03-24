@@ -1276,7 +1276,7 @@ function selecionarData(data) {
      /* const servicosLista = servicosDoProfissional.map(s => 
         `<div style="margin-bottom: 5px;"><strong>${s.nome}</strong> - ${s.tempo_minutos}min (R$ ${s.preco.toFixed(2)})</div>`
       ).join('');*/
-      const servicosLista = `<div style="color: var(--muted); font-size: 14px;">${servicosDoProfissional.map(s => s.nome).join(', ')}</div>`;
+     const servicosLista = `<div style="color: var(--muted); font-size: 14px;">${servicosDoProfissional.map(s => s.nome).join('<br>')}</div>`; 
       // ✅ VERIFICA SE ESTE PROFISSIONAL TEM FOLGA ESPECÍFICA
       const temFolgaProfissional = folgas.some(f => f.data_folga === dataSelecionada && f.profissional === profissional);
       
@@ -1296,18 +1296,19 @@ function selecionarData(data) {
           </div>
         `;
       }*/ 
-      if (temFolgaProfissional) {
-   html += `
-    <div class="profissional-item" style="background: #2a1a1a; border-color: var(--red); opacity: 0.7; cursor: not-allowed;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <h3 style="font-size: 18px; margin-bottom: 5px; color: var(--red);">👨‍💼 ${profissional} 🏖️</h3>
-          <div style="color: var(--red); font-weight: 600;">⛔ Profissional em folga</div>
+if (temFolgaProfissional) {
+  html += `
+    <div class="profissional-item" style="background: #fee2e2; border-color: var(--red); opacity: 0.7; cursor: not-allowed;" title="Este profissional está de folga">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div style="flex: 1;">
+          <h3 style="font-size: 18px; margin-bottom: 10px; color: var(--red);">👨‍💼 ${profissional} 🏖️</h3>
+          <div style="color: var(--muted); font-size: 14px;">${servicosDoProfissional.map(s => s.nome).join(', ')}</div>
+          <div style="color: var(--red); font-weight: 600; margin-top: 10px;">⛔ Profissional em folga</div>
         </div>
       </div>
     </div>
-     `;  
-    }  else {
+  `;
+} else {
         // Pega avaliação discreta do profissional
         let mediaHtml = '';
         const servicoRef = servicosDoProfissional[0];
