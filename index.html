@@ -1275,7 +1275,6 @@ function selecionarData(data) {
       const servicosDoProfissional = servicos.filter(s => s.profissional === profissional);
       const nomesServicos = servicosDoProfissional.map(s => s.nome).join('<br>');
 
-      // Avaliação discreta (igual para folga e normal)
       let mediaHtml = '';
       const servicoRef = servicosDoProfissional[0];
       if (servicoRef && servicoRef.avaliacoes) {
@@ -1283,7 +1282,7 @@ function selecionarData(data) {
           const notas = JSON.parse(servicoRef.avaliacoes);
           if (notas.length > 0) {
             const media = (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1);
-            mediaHtml = `<span style="color:var(--orange);font-size:12px;font-weight:400;margin-left:14px;opacity:0.75;">⭐ ${media}</span>`;
+            mediaHtml = `<span style="color:var(--orange);font-size:12px;font-weight:400;margin-left:14px;opacity:0.8;">⭐ ${media}</span>`;
           }
         } catch(e) {}
       }
@@ -1292,32 +1291,30 @@ function selecionarData(data) {
       
       if (temFolgaProfissional) {
         html += `
-          <div class="profissional-item" style="background: #fee2e2; border-color: var(--red); opacity: 0.7; cursor: not-allowed;" title="Este profissional está de folga">
+          <div class="profissional-item" style="background: #fee2e2; border-color: var(--red); opacity: 0.7; cursor: not-allowed;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
               <div style="flex: 1;">
                 <div style="display:flex;align-items:center;margin-bottom:8px;">
-                  <h3 style="font-size: 18px; color: var(--red); margin:0;">👨‍💼 ${profissional} 🏖️</h3>${mediaHtml}
+                  <h3 style="font-size:18px;color:var(--red);margin:0;">👨‍💼 ${profissional} 🏖️</h3>${mediaHtml}
                 </div>
-                <div style="color: var(--red); font-size: 14px;">${nomesServicos}</div>
-                <div style="color: var(--red); font-weight: 600; margin-top: 10px;">⛔ Profissional em folga</div>
+                <div style="color:var(--red);font-size:14px;">${nomesServicos}</div>
+                <div style="color:var(--red);font-weight:600;margin-top:10px;">⛔ Profissional em folga</div>
               </div>
             </div>
-          </div>
-        `;
+          </div>`;
       } else {
         html += `
           <div class="profissional-item" onclick="selecionarProfissional('${profissional}')">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
               <div style="flex: 1;">
                 <div style="display:flex;align-items:center;margin-bottom:8px;">
-                  <h3 style="font-size: 18px; color: var(--text); margin:0;">👨‍💼 ${profissional}</h3>${mediaHtml}
+                  <h3 style="font-size:18px;color:var(--text);margin:0;">👨‍💼 ${profissional}</h3>${mediaHtml}
                 </div>
-                <div style="color: var(--muted); font-size: 14px;">${nomesServicos}</div>
+                <div style="color:var(--muted);font-size:14px;">${nomesServicos}</div>
               </div>
-              <div style="color: var(--accent); font-size: 24px; margin-left: 15px;">→</div>
+              <div style="color:var(--accent);font-size:24px;margin-left:15px;">→</div>
             </div>
-          </div>
-        `;
+          </div>`;
       }
     });
     
@@ -2076,8 +2073,8 @@ async function carregarTelaAvaliar() {
       return;
     }
 
-    // Avaliações feitas por este dispositivo (localStorage) — 1 por profissional, sem desavaliar
-    const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '[]');
+    // localStorage guarda { profissional: nota } para saber nota atual do usuário
+    const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '{}');
 
     let html = '';
     for (const prof of profissionaisUnicos) {
@@ -2093,15 +2090,19 @@ async function carregarTelaAvaliar() {
         } catch(e) {}
       }
 
-      const jaAvaliou = avaliacoesFeitas.includes(prof);
+      const notaAtual = avaliacoesFeitas[prof]; // undefined se nunca avaliou
+      const jaAvaliou = notaAtual !== undefined;
+      const labelBtn = jaAvaliou ? `✏️ Editar (${notaAtual}⭐)` : '→';
+      const corBtn = jaAvaliou ? 'var(--orange)' : 'var(--accent)';
+
       html += `
-        <div class="profissional-item" ${!jaAvaliou ? `onclick="abrirAvaliarProfissional('${prof}')"` : ''} style="${jaAvaliou ? 'opacity:0.55;cursor:not-allowed;' : ''}">
+        <div class="profissional-item" onclick="abrirAvaliarProfissional('${prof}')">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div>
               <div style="font-size:17px;font-weight:700;color:var(--text);">👨‍💼 ${prof}</div>
               ${mediaHtml ? `<div style="margin-top:4px;">${mediaHtml}</div>` : ''}
             </div>
-            <div style="color:${jaAvaliou ? 'var(--green)' : 'var(--accent)'};font-size:13px;font-weight:600;">${jaAvaliou ? '✅ Avaliado' : '→'}</div>
+            <div style="color:${corBtn};font-size:13px;font-weight:600;">${labelBtn}</div>
           </div>
         </div>`;
     }
@@ -2113,17 +2114,27 @@ async function carregarTelaAvaliar() {
 }
 
 function abrirAvaliarProfissional(profissional) {
-  // Garante que não abre se já avaliou (dupla proteção)
-  const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '[]');
-  if (avaliacoesFeitas.includes(profissional)) return;
-
   profissionalParaAvaliar = profissional;
   notaSelecionada = null;
+
   document.getElementById('avaliarNomeProfissional').textContent = '👨‍💼 ' + profissional;
   document.getElementById('btnConfirmarAvaliacao').style.display = 'none';
   document.getElementById('btnConfirmarAvaliacao').disabled = false;
   document.getElementById('btnConfirmarAvaliacao').textContent = '✅ Confirmar Avaliação';
-  document.querySelectorAll('.estrela-avaliacao').forEach(e => e.style.opacity = '0.3');
+
+  // Se já avaliou, pré-seleciona a nota anterior
+  const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '{}');
+  const notaAnterior = avaliacoesFeitas[profissional];
+  if (notaAnterior) {
+    document.querySelectorAll('.estrela-avaliacao').forEach(e => {
+      e.style.opacity = parseInt(e.dataset.nota) <= notaAnterior ? '1' : '0.3';
+    });
+    notaSelecionada = notaAnterior;
+    document.getElementById('btnConfirmarAvaliacao').style.display = 'block';
+  } else {
+    document.querySelectorAll('.estrela-avaliacao').forEach(e => e.style.opacity = '0.3');
+  }
+
   document.getElementById('listaAvaliarProfissionais').style.display = 'none';
   document.getElementById('subTelaEstrelas').style.display = 'block';
 }
@@ -2145,14 +2156,6 @@ function selecionarEstrela(nota) {
 
 async function confirmarAvaliacao() {
   if (!profissionalParaAvaliar || !notaSelecionada) return;
-
-  // Dupla proteção: não deixa confirmar se já avaliou
-  const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '[]');
-  if (avaliacoesFeitas.includes(profissionalParaAvaliar)) {
-    mostrarMensagem('Você já avaliou este profissional!', 'erro');
-    voltarListaAvaliacao();
-    return;
-  }
 
   const btn = document.getElementById('btnConfirmarAvaliacao');
   btn.disabled = true;
@@ -2183,12 +2186,21 @@ async function confirmarAvaliacao() {
       return;
     }
 
-    // Atualiza array de notas no campo avaliacoes de todos os serviços do profissional
     const servicosDoProf = servicos.filter(s => s.profissional === profissionalParaAvaliar);
     if (servicosDoProf.length === 0) throw new Error('Profissional não encontrado');
 
+    // Pega nota anterior do localStorage para substituir no array
+    const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '{}');
+    const notaAnterior = avaliacoesFeitas[profissionalParaAvaliar];
+
     let notas = [];
     try { notas = JSON.parse(servicosDoProf[0].avaliacoes || '[]'); } catch(e) { notas = []; }
+
+    if (notaAnterior !== undefined) {
+      // Remove a nota anterior e coloca a nova
+      const idx = notas.indexOf(notaAnterior);
+      if (idx !== -1) notas.splice(idx, 1);
+    }
     notas.push(notaSelecionada);
 
     for (const sv of servicosDoProf) {
@@ -2198,11 +2210,11 @@ async function confirmarAvaliacao() {
       });
     }
 
-    // Salva no localStorage — sem possibilidade de remover depois
-    avaliacoesFeitas.push(profissionalParaAvaliar);
+    // Salva nova nota no localStorage
+    avaliacoesFeitas[profissionalParaAvaliar] = notaSelecionada;
     localStorage.setItem('avaliacoes_feitas', JSON.stringify(avaliacoesFeitas));
 
-    mostrarMensagem('Avaliação enviada! ⭐', 'sucesso');
+    mostrarMensagem(notaAnterior ? 'Avaliação atualizada! ⭐' : 'Avaliação enviada! ⭐', 'sucesso');
     voltarListaAvaliacao();
     await carregarTelaAvaliar();
   } catch(e) {
