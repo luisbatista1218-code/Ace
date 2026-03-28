@@ -2084,21 +2084,32 @@ async function carregarTelaAvaliar() {
 
     let html = '';
     for (const prof of profissionaisUnicos) {
-      let mediaHtml = '';
+      let media = null;
+      let totalNotas = 0;
       const servicoRef = servicos.find(s => s.profissional === prof);
       if (servicoRef && servicoRef.avaliacoes) {
         try {
-          const notas = JSON.parse(servicoRef.avaliacoes);
+          const notas = JSON.parse(servicoRef.avaliacoes).map(Number);
           if (notas.length > 0) {
-            const media = (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1);
-            mediaHtml = `<span style="color:var(--orange);font-size:13px;margin-left:8px;">⭐ ${media} <span style="color:var(--muted);font-size:11px;">(${notas.length})</span></span>`;
+            media = (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1);
+            totalNotas = notas.length;
           }
         } catch(e) {}
       }
 
-      const notaAtual = avaliacoesFeitas[prof]; // undefined se nunca avaliou
+      const notaAtual = avaliacoesFeitas[prof];
       const jaAvaliou = notaAtual !== undefined;
-      const labelBtn = jaAvaliou ? `✏️ Editar (${notaAtual}⭐)` : '→';
+
+      // Linha única: média geral + indicador da nota do usuário
+      let infoHtml = '';
+      if (media) {
+        infoHtml = `<div style="margin-top:4px;color:var(--orange);font-size:13px;">⭐ ${media} <span style="color:var(--muted);font-size:11px;">(${totalNotas} avaliações)</span></div>`;
+      }
+      if (jaAvaliou) {
+        infoHtml += `<div style="margin-top:2px;color:var(--muted);font-size:12px;">Sua nota: ${'⭐'.repeat(notaAtual)}</div>`;
+      }
+
+      const labelBtn = jaAvaliou ? '✏️ Editar' : '→';
       const corBtn = jaAvaliou ? 'var(--orange)' : 'var(--accent)';
 
       html += `
@@ -2106,7 +2117,7 @@ async function carregarTelaAvaliar() {
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div>
               <div style="font-size:17px;font-weight:700;color:var(--text);">👨‍💼 ${prof}</div>
-              ${mediaHtml ? `<div style="margin-top:4px;">${mediaHtml}</div>` : ''}
+              ${infoHtml}
             </div>
             <div style="color:${corBtn};font-size:13px;font-weight:600;">${labelBtn}</div>
           </div>
