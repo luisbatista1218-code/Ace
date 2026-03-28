@@ -2153,7 +2153,8 @@ function mostrarMensagem(texto, tipo) {
   }, 5000);
 }
 
-// ========== AVALIAÇÕES ==========
+// ========== AVALIAÇÕES - CORRIGIDO ==========
+
 let profissionalParaAvaliar = null;
 let notaSelecionada = null;
 
@@ -2165,12 +2166,24 @@ async function carregarTelaAvaliar() {
   lista.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
 
   try {
-    await carregarServicos();
+    // Força carregamento dos serviços
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/servicos?select=*`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    
+    const servicosData = await response.json();
     
     // Pega profissionais únicos
-    const profissionaisUnicos = [...new Set(servicos.map(s => s.profissional).filter(Boolean))];
-    
-    console.log('Profissionais encontrados:', profissionaisUnicos);
+    const profissionaisUnicos = [];
+    for (let i = 0; i < servicosData.length; i++) {
+      const prof = servicosData[i].profissional;
+      if (prof && !profissionaisUnicos.includes(prof)) {
+        profissionaisUnicos.push(prof);
+      }
+    }
 
     if (profissionaisUnicos.length === 0) {
       lista.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Nenhum profissional encontrado</div>';
@@ -2178,34 +2191,39 @@ async function carregarTelaAvaliar() {
     }
 
     const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '[]');
-
     let html = '';
-    for (const prof of profissionaisUnicos) {
+    
+    for (let i = 0; i < profissionaisUnicos.length; i++) {
+      const prof = profissionaisUnicos[i];
       let mediaHtml = '';
       
       // Pega avaliações do profissional
-      const servicosDoProf = servicos.filter(s => s.profissional === prof);
+      const servicosDoProf = servicosData.filter(s => s.profissional === prof);
       let todasNotas = [];
       
-      servicosDoProf.forEach(servico => {
+      for (let j = 0; j < servicosDoProf.length; j++) {
+        const servico = servicosDoProf[j];
         if (servico.avaliacoes) {
           try {
-            // Se for string, tenta parsear JSON
             let notas = servico.avaliacoes;
             if (typeof notas === 'string') {
               notas = JSON.parse(notas);
             }
             if (Array.isArray(notas)) {
-              todasNotas = todasNotas.concat(notas);
+              for (let k = 0; k < notas.length; k++) {
+                todasNotas.push(notas[k]);
+              }
             }
-          } catch(e) {
-            console.log('Erro ao parsear avaliações:', e);
-          }
+          } catch(e) {}
         }
-      });
+      }
       
       if (todasNotas.length > 0) {
-        const media = (todasNotas.reduce((a, b) => a + b, 0) / todasNotas.length).toFixed(1);
+        let soma = 0;
+        for (let k = 0; k < todasNotas.length; k++) {
+          soma += todasNotas[k];
+        }
+        const media = (soma / todasNotas.length).toFixed(1);
         mediaHtml = `<span style="color:var(--orange);font-size:13px;margin-left:8px;">⭐ ${media}</span>`;
       }
 
@@ -2234,15 +2252,12 @@ function abrirAvaliarProfissional(profissional) {
   document.getElementById('avaliarNomeProfissional').textContent = '👨‍💼 ' + profissional;
   document.getElementById('btnConfirmarAvaliacao').style.display = 'none';
   
-  // RESETA AS ESTRELAS VISUALMENTE
   const estrelas = document.querySelectorAll('.estrela-avaliacao');
-  estrelas.forEach(estrela => {
-    estrela.style.opacity = '0.3';
-    // Remove qualquer evento antigo e adiciona novo
-    const nota = parseInt(estrela.dataset.nota);
-    estrela.onclick = null;
-    estrela.onclick = function() { selecionarEstrela(nota); };
-  });
+  for (let i = 0; i < estrelas.length; i++) {
+    estrelas[i].style.opacity = '0.3';
+    const nota = parseInt(estrelas[i].getAttribute('data-nota'));
+    estrelas[i].onclick = function() { selecionarEstrela(nota); };
+  }
   
   document.getElementById('listaAvaliarProfissionais').style.display = 'none';
   document.getElementById('subTelaEstrelas').style.display = 'block';
@@ -2258,16 +2273,11 @@ function voltarListaAvaliacao() {
 function selecionarEstrela(nota) {
   notaSelecionada = nota;
   
-  // Atualiza visual das estrelas
   const estrelas = document.querySelectorAll('.estrela-avaliacao');
-  estrelas.forEach(estrela => {
-    const notaEstrela = parseInt(estrela.dataset.nota);
-    if (notaEstrela <= nota) {
-      estrela.style.opacity = '1';
-    } else {
-      estrela.style.opacity = '0.3';
-    }
-  });
+  for (let i = 0; i < estrelas.length; i++) {
+    const notaEstrela = parseInt(estrelas[i].getAttribute('data-nota'));
+    estrelas[i].style.opacity = notaEstrela <= nota ? '1' : '0.3';
+  }
   
   document.getElementById('btnConfirmarAvaliacao').style.display = 'block';
 }
@@ -2283,7 +2293,6 @@ async function confirmarAvaliacao() {
   btn.textContent = 'Salvando...';
 
   try {
-    // Verifica se tem agendamento pelo telefone salvo
     const telefone = localStorage.getItem('cliente_telefone');
     if (!telefone) {
       mostrarMensagem('Faça um agendamento primeiro para avaliar!', 'erro');
@@ -2294,13 +2303,23 @@ async function confirmarAvaliacao() {
     
     const telefoneLimpo = telefone.replace(/\D/g, '');
     const ags = await fetchSupabase(`agenda?telefone=eq.${telefoneLimpo}&select=servico_id`);
-    await carregarServicos();
+    
+    const servicosResponse = await fetch(`${SUPABASE_URL}/rest/v1/servicos?select=*`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    const servicosData = await servicosResponse.json();
     
     const profissionaisDoCliente = [];
-    for (const ag of (ags || [])) {
-      const s = servicos.find(sv => sv.id === ag.servico_id);
-      if (s && s.profissional) {
-        profissionaisDoCliente.push(s.profissional);
+    for (let i = 0; i < (ags || []).length; i++) {
+      const ag = ags[i];
+      for (let j = 0; j < servicosData.length; j++) {
+        const s = servicosData[j];
+        if (s.id === ag.servico_id && s.profissional && !profissionaisDoCliente.includes(s.profissional)) {
+          profissionaisDoCliente.push(s.profissional);
+        }
       }
     }
 
@@ -2311,15 +2330,13 @@ async function confirmarAvaliacao() {
       return;
     }
 
-    // Pega TODOS os serviços deste profissional
-    const servicosDoProf = servicos.filter(s => s.profissional === profissionalParaAvaliar);
+    const servicosDoProf = servicosData.filter(s => s.profissional === profissionalParaAvaliar);
     if (servicosDoProf.length === 0) throw new Error('Profissional não encontrado');
 
-    // Atualiza avaliações em todos os serviços do profissional
-    for (const servico of servicosDoProf) {
+    for (let i = 0; i < servicosDoProf.length; i++) {
+      const servico = servicosDoProf[i];
       let notas = [];
       
-      // Tenta parsear avaliações existentes
       if (servico.avaliacoes) {
         try {
           if (typeof servico.avaliacoes === 'string') {
@@ -2332,17 +2349,14 @@ async function confirmarAvaliacao() {
         }
       }
       
-      // Adiciona nova nota
       notas.push(notaSelecionada);
       
-      // Salva no banco
       await fetchSupabase(`servicos?id=eq.${servico.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ avaliacoes: JSON.stringify(notas) })
       });
     }
 
-    // Marca como avaliado no localStorage
     const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '[]');
     if (!avaliacoesFeitas.includes(profissionalParaAvaliar)) {
       avaliacoesFeitas.push(profissionalParaAvaliar);
@@ -2355,7 +2369,7 @@ async function confirmarAvaliacao() {
     
   } catch(e) {
     console.error('Erro ao salvar avaliação:', e);
-    mostrarMensagem('Erro ao salvar avaliação: ' + e.message, 'erro');
+    mostrarMensagem('Erro ao salvar avaliação', 'erro');
   } finally {
     btn.disabled = false;
     btn.textContent = '✅ Confirmar Avaliação';
