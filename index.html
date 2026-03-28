@@ -2074,7 +2074,13 @@ async function carregarTelaAvaliar() {
     }
 
     // localStorage guarda { profissional: nota } para saber nota atual do usuário
-    const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '{}');
+    // Migra formato antigo (array) para novo (objeto) se necessário
+    let avaliacoesFeitas = {};
+    try {
+      const raw = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '{}');
+      avaliacoesFeitas = Array.isArray(raw) ? {} : raw;
+      localStorage.setItem('avaliacoes_feitas', JSON.stringify(avaliacoesFeitas));
+    } catch(e) { avaliacoesFeitas = {}; }
 
     let html = '';
     for (const prof of profissionaisUnicos) {
@@ -2123,7 +2129,11 @@ function abrirAvaliarProfissional(profissional) {
   document.getElementById('btnConfirmarAvaliacao').textContent = '✅ Confirmar Avaliação';
 
   // Se já avaliou, pré-seleciona a nota anterior
-  const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '{}');
+  let avaliacoesFeitas = {};
+  try {
+    const raw = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '{}');
+    avaliacoesFeitas = Array.isArray(raw) ? {} : raw;
+  } catch(e) { avaliacoesFeitas = {}; }
   const notaAnterior = avaliacoesFeitas[profissional];
   if (notaAnterior) {
     document.querySelectorAll('.estrela-avaliacao').forEach(e => {
@@ -2190,18 +2200,26 @@ async function confirmarAvaliacao() {
     if (servicosDoProf.length === 0) throw new Error('Profissional não encontrado');
 
     // Pega nota anterior do localStorage para substituir no array
-    const avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '{}');
+    // Migra formato antigo (array) para novo (objeto) se necessário
+    let avaliacoesFeitas = {};
+    try {
+      const raw = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '{}');
+      avaliacoesFeitas = Array.isArray(raw) ? {} : raw;
+    } catch(e) { avaliacoesFeitas = {}; }
+
     const notaAnterior = avaliacoesFeitas[profissionalParaAvaliar];
 
     let notas = [];
     try { notas = JSON.parse(servicosDoProf[0].avaliacoes || '[]'); } catch(e) { notas = []; }
+    // Garante que todas as notas são números
+    notas = notas.map(n => Number(n));
 
     if (notaAnterior !== undefined) {
-      // Remove a nota anterior e coloca a nova
-      const idx = notas.indexOf(notaAnterior);
+      // Remove a nota anterior (compara como número)
+      const idx = notas.indexOf(Number(notaAnterior));
       if (idx !== -1) notas.splice(idx, 1);
     }
-    notas.push(notaSelecionada);
+    notas.push(Number(notaSelecionada));
 
     for (const sv of servicosDoProf) {
       await fetchSupabase(`servicos?id=eq.${sv.id}`, {
