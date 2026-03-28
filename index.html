@@ -230,7 +230,7 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
   <div class="botoes-acoes" id="telaInicial">
     <button class="btn-acao" onclick="mostrarServicos()">💈 Serviços</button>
     <button class="btn-acao" onclick="mostrarCalendario()">📅 Agendar</button>
-    <button class="btn-acao" onclick="mostrarAreaCliente()">👤 Sua agenda</button>
+    <button class="btn-acao" onclick="mostrarAvaliar()">⭐️ Avaliar</button>
   </div>
   
   <div class="servicos-container" id="telaServicos">
@@ -292,6 +292,28 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
     <div class="agenda-lista" id="listaAgendaCliente"><div class="loading"><div class="loading-spinner"></div>Carregando...</div></div>
   </div>
   
+  <!-- TELA AVALIAR -->
+  <div class="area-cliente" id="telaAvaliar">
+    <button class="voltar-btn" onclick="voltarInicio()">← Voltar</button>
+    <h2 class="titulo-secao">⭐️ Avaliar Profissional</h2>
+    <div id="listaAvaliarProfissionais"></div>
+    <div id="subTelaEstrelas" style="display:none;">
+      <button class="voltar-btn" onclick="voltarListaAvaliacao()">← Voltar</button>
+      <div style="background:var(--card);border-radius:12px;padding:25px;border:2px solid var(--border);text-align:center;">
+        <h3 id="avaliarNomeProfissional" style="margin-bottom:20px;font-family:'Syne',sans-serif;color:var(--text);"></h3>
+        <p style="color:var(--muted);margin-bottom:20px;">Toque nas estrelas para avaliar</p>
+        <div style="display:flex;justify-content:center;gap:12px;margin-bottom:25px;">
+          <span class="estrela-avaliacao" data-nota="1" onclick="selecionarEstrela(1)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+          <span class="estrela-avaliacao" data-nota="2" onclick="selecionarEstrela(2)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+          <span class="estrela-avaliacao" data-nota="3" onclick="selecionarEstrela(3)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+          <span class="estrela-avaliacao" data-nota="4" onclick="selecionarEstrela(4)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+          <span class="estrela-avaliacao" data-nota="5" onclick="selecionarEstrela(5)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+        </div>
+        <button id="btnConfirmarAvaliacao" class="btn-admin" onclick="confirmarAvaliacao()" style="display:none;background:var(--green);">✅ Confirmar Avaliação</button>
+      </div>
+    </div>
+  </div>
+
   <div class="ajuda-container" id="telaAjuda">
     <button class="voltar-btn" onclick="voltarInicio()">← Voltar</button>
     <h2 class="titulo-secao">Dúvidas</h2>
@@ -1061,6 +1083,7 @@ function mostrarTela(tela) {
   else if (tela === 'ajuda') document.getElementById('telaAjuda').style.display = 'block';
   else if (tela === 'admin') { document.getElementById('telaAdmin').style.display = 'block'; carregarAdmin(); }
   else if (tela === 'pdf') document.getElementById('telaPDF').style.display = 'block';
+  else if (tela === 'avaliar') { document.getElementById('telaAvaliar').style.display = 'block'; carregarTelaAvaliar(); }
 }
 
 function voltarInicio() { mostrarTela('inicio'); }
@@ -1070,6 +1093,7 @@ function mostrarProfissionais() { mostrarTela('profissionais'); }
 function mostrarHorarios() { mostrarTela('horarios'); }
 function mostrarAreaCliente() { mostrarTela('cliente'); }
 function mostrarAjuda() { mostrarTela('ajuda'); }
+function mostrarAvaliar() { mostrarTela('avaliar'); }
 
 async function carregarServicosCliente() {
   const container = document.getElementById('listaServicosCliente');
@@ -1249,50 +1273,43 @@ function selecionarData(data) {
     let html = '';
     profissionaisUnicos.forEach(profissional => {
       const servicosDoProfissional = servicos.filter(s => s.profissional === profissional);
-      const nomesServicos = servicosDoProfissional.map(s => s.nome).join('<br>');
-
-      // Calcula média com novo formato {tel, nota}
-      let mediaHtml = '';
-      const servicoRef = servicosDoProfissional[0];
-      if (servicoRef && servicoRef.avaliacoes) {
-        try {
-          let notas = JSON.parse(servicoRef.avaliacoes);
-          const vals = notas.map(n => typeof n === 'object' ? n.nota : Number(n));
-          if (vals.length > 0) {
-            const media = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
-            mediaHtml = `<span style="color:var(--orange);font-size:12px;font-weight:400;margin-left:14px;opacity:0.8;">⭐ ${media}</span>`;
-          }
-        } catch(e) {}
-      }
-
+      const servicosLista = servicosDoProfissional.map(s => 
+        `<div style="margin-bottom: 5px;"><strong>${s.nome}</strong> - ${s.tempo_minutos}min (R$ ${s.preco.toFixed(2)})</div>`
+      ).join('');
+      
+      // ✅ VERIFICA SE ESTE PROFISSIONAL TEM FOLGA ESPECÍFICA
       const temFolgaProfissional = folgas.some(f => f.data_folga === dataSelecionada && f.profissional === profissional);
       
       if (temFolgaProfissional) {
+        // PROFISSIONAL DE FOLGA: VERMELHO E SEM CLIQUE (layout original preservado)
         html += `
-          <div class="profissional-item" style="background: #fee2e2; border-color: var(--red); opacity: 0.7; cursor: not-allowed;">
+          <div class="profissional-item" style="background: #fee2e2; border-color: var(--red); opacity: 0.7; cursor: not-allowed;" title="Este profissional está de folga">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
               <div style="flex: 1;">
-                <div style="display:flex;align-items:center;margin-bottom:8px;">
-                  <h3 style="font-size:18px;color:var(--red);margin:0;">👨‍💼 ${profissional} 🏖️</h3>${mediaHtml}
+                <h3 style="font-size: 18px; margin-bottom: 10px; color: var(--red);">👨‍💼 ${profissional} 🏖️</h3>
+                <div style="color: var(--red); font-size: 14px;">
+                  ${servicosLista}
                 </div>
-                <div style="color:var(--red);font-size:14px;">${nomesServicos}</div>
-                <div style="color:var(--red);font-weight:600;margin-top:10px;">⛔ Profissional em folga</div>
+                <div style="color: var(--red); font-weight: 600; margin-top: 10px;">⛔ Profissional em folga</div>
               </div>
             </div>
-          </div>`;
+          </div>
+        `;
       } else {
+        // PROFISSIONAL NORMAL (layout original)
         html += `
           <div class="profissional-item" onclick="selecionarProfissional('${profissional}')">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
               <div style="flex: 1;">
-                <div style="display:flex;align-items:center;margin-bottom:8px;">
-                  <h3 style="font-size:18px;color:var(--text);margin:0;">👨‍💼 ${profissional}</h3>${mediaHtml}
+                <h3 style="font-size: 18px; margin-bottom: 10px; color: var(--text);">👨‍💼 ${profissional}</h3>
+                <div style="color: var(--muted); font-size: 14px;">
+                  ${servicosLista}
                 </div>
-                <div style="color:var(--muted);font-size:14px;">${nomesServicos}</div>
               </div>
-              <div style="color:var(--accent);font-size:24px;margin-left:15px;">→</div>
+              <div style="color: var(--accent); font-size: 24px; margin-left: 15px;">→</div>
             </div>
-          </div>`;
+          </div>
+        `;
       }
     });
     
@@ -2029,187 +2046,6 @@ function mostrarMensagem(texto, tipo) {
   setTimeout(() => {
     if (mensagem.parentElement) mensagem.remove();
   }, 5000);
-}
-
-// ========== AVALIAÇÕES ==========
-let profissionalParaAvaliar = null;
-let notaSelecionada = null;
-
-async function carregarTelaAvaliar() {
-  const lista = document.getElementById('listaAvaliarProfissionais');
-  const subTela = document.getElementById('subTelaEstrelas');
-  subTela.style.display = 'none';
-  lista.style.display = 'block';
-  lista.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
-
-  try {
-    await carregarServicos();
-    const profissionaisUnicos = [...new Set(servicos.map(s => s.profissional).filter(Boolean))];
-
-    if (profissionaisUnicos.length === 0) {
-      lista.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Nenhum profissional encontrado</div>';
-      return;
-    }
-
-    const telefoneLimpo = (localStorage.getItem('cliente_telefone') || '').replace(/\D/g, '');
-
-    let html = '';
-    for (const prof of profissionaisUnicos) {
-      const servicoRef = servicos.find(s => s.profissional === prof);
-      let notas = [];
-      try { notas = JSON.parse(servicoRef?.avaliacoes || '[]'); } catch(e) {}
-
-      // Migra formato antigo (array de números simples) para objetos
-      if (notas.length > 0 && typeof notas[0] !== 'object') {
-        notas = notas.map(n => ({ tel: null, nota: Number(n) }));
-      }
-
-      // Média geral
-      let mediaHtml = '';
-      if (notas.length > 0) {
-        const media = (notas.reduce((a, b) => a + b.nota, 0) / notas.length).toFixed(1);
-        mediaHtml = `<div style="margin-top:4px;color:var(--orange);font-size:13px;">⭐ ${media} <span style="color:var(--muted);font-size:11px;">(${notas.length} avaliações)</span></div>`;
-      }
-
-      // Nota deste usuário pelo telefone
-      const minhaAvaliacao = notas.find(n => n.tel === telefoneLimpo);
-      let minhaNotaHtml = '';
-      if (minhaAvaliacao) {
-        minhaNotaHtml = `<div style="margin-top:2px;color:var(--muted);font-size:12px;">Sua nota: ${'⭐'.repeat(minhaAvaliacao.nota)}</div>`;
-      }
-
-      const jaAvaliou = !!minhaAvaliacao;
-      html += `
-        <div class="profissional-item" onclick="abrirAvaliarProfissional('${prof}')">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <div style="font-size:17px;font-weight:700;color:var(--text);">👨‍💼 ${prof}</div>
-              ${mediaHtml}${minhaNotaHtml}
-            </div>
-            <div style="color:${jaAvaliou ? 'var(--orange)' : 'var(--accent)'};font-size:13px;font-weight:600;">${jaAvaliou ? '✏️ Editar' : '→'}</div>
-          </div>
-        </div>`;
-    }
-
-    lista.innerHTML = html;
-  } catch(e) {
-    lista.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red);">⚠️ Erro ao carregar</div>';
-  }
-}
-
-function abrirAvaliarProfissional(profissional) {
-  profissionalParaAvaliar = profissional;
-  notaSelecionada = null;
-
-  document.getElementById('avaliarNomeProfissional').textContent = '👨‍💼 ' + profissional;
-  document.getElementById('btnConfirmarAvaliacao').style.display = 'none';
-  document.getElementById('btnConfirmarAvaliacao').disabled = false;
-  document.getElementById('btnConfirmarAvaliacao').textContent = '✅ Confirmar Avaliação';
-
-  // Pré-seleciona nota anterior pelo telefone no banco
-  const telefoneLimpo = (localStorage.getItem('cliente_telefone') || '').replace(/\D/g, '');
-  const servicoRef = servicos.find(s => s.profissional === profissional);
-  let notas = [];
-  try { notas = JSON.parse(servicoRef?.avaliacoes || '[]'); } catch(e) {}
-  if (notas.length > 0 && typeof notas[0] !== 'object') {
-    notas = notas.map(n => ({ tel: null, nota: Number(n) }));
-  }
-  const minhaAvaliacao = notas.find(n => n.tel === telefoneLimpo);
-
-  if (minhaAvaliacao) {
-    notaSelecionada = minhaAvaliacao.nota;
-    document.querySelectorAll('.estrela-avaliacao').forEach(e => {
-      e.style.opacity = parseInt(e.dataset.nota) <= minhaAvaliacao.nota ? '1' : '0.3';
-    });
-    document.getElementById('btnConfirmarAvaliacao').style.display = 'block';
-  } else {
-    document.querySelectorAll('.estrela-avaliacao').forEach(e => e.style.opacity = '0.3');
-  }
-
-  document.getElementById('listaAvaliarProfissionais').style.display = 'none';
-  document.getElementById('subTelaEstrelas').style.display = 'block';
-}
-
-function voltarListaAvaliacao() {
-  document.getElementById('subTelaEstrelas').style.display = 'none';
-  document.getElementById('listaAvaliarProfissionais').style.display = 'block';
-  profissionalParaAvaliar = null;
-  notaSelecionada = null;
-}
-
-function selecionarEstrela(nota) {
-  notaSelecionada = nota;
-  document.querySelectorAll('.estrela-avaliacao').forEach(e => {
-    e.style.opacity = parseInt(e.dataset.nota) <= nota ? '1' : '0.3';
-  });
-  document.getElementById('btnConfirmarAvaliacao').style.display = 'block';
-}
-
-async function confirmarAvaliacao() {
-  if (!profissionalParaAvaliar || !notaSelecionada) return;
-
-  const btn = document.getElementById('btnConfirmarAvaliacao');
-  btn.disabled = true;
-  btn.textContent = 'Salvando...';
-
-  try {
-    const telefone = localStorage.getItem('cliente_telefone');
-    if (!telefone) {
-      mostrarMensagem('Faça um agendamento primeiro para avaliar!', 'erro');
-      btn.disabled = false;
-      btn.textContent = '✅ Confirmar Avaliação';
-      return;
-    }
-    const telefoneLimpo = telefone.replace(/\D/g, '');
-
-    // Verifica se agendou com este profissional
-    const ags = await fetchSupabase(`agenda?telefone=eq.${telefoneLimpo}&select=servico_id`);
-    await carregarServicos();
-    const profissionaisDoCliente = (ags || []).map(ag => {
-      const s = servicos.find(sv => sv.id === ag.servico_id);
-      return s ? s.profissional : null;
-    }).filter(Boolean);
-
-    if (!profissionaisDoCliente.includes(profissionalParaAvaliar)) {
-      mostrarMensagem('Você precisa ter agendado com este profissional para avaliar!', 'erro');
-      btn.disabled = false;
-      btn.textContent = '✅ Confirmar Avaliação';
-      return;
-    }
-
-    const servicosDoProf = servicos.filter(s => s.profissional === profissionalParaAvaliar);
-    if (servicosDoProf.length === 0) throw new Error('Profissional não encontrado');
-
-    // Lê array do banco
-    let notas = [];
-    try { notas = JSON.parse(servicosDoProf[0].avaliacoes || '[]'); } catch(e) {}
-
-    // Migra formato antigo
-    if (notas.length > 0 && typeof notas[0] !== 'object') {
-      notas = notas.map(n => ({ tel: null, nota: Number(n) }));
-    }
-
-    const jaAvaliou = notas.some(n => n.tel === telefoneLimpo);
-
-    // Remove avaliação anterior deste telefone e adiciona nova
-    notas = notas.filter(n => n.tel !== telefoneLimpo);
-    notas.push({ tel: telefoneLimpo, nota: Number(notaSelecionada) });
-
-    for (const sv of servicosDoProf) {
-      await fetchSupabase(`servicos?id=eq.${sv.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ avaliacoes: JSON.stringify(notas) })
-      });
-    }
-
-    mostrarMensagem(jaAvaliou ? 'Avaliação atualizada! ⭐' : 'Avaliação enviada! ⭐', 'sucesso');
-    voltarListaAvaliacao();
-    await carregarTelaAvaliar();
-  } catch(e) {
-    mostrarMensagem('Erro ao salvar avaliação', 'erro');
-    btn.disabled = false;
-    btn.textContent = '✅ Confirmar Avaliação';
-  }
 }
 
 // ========== VARIÁVEIS E FUNÇÃO DO MODAL ==========
