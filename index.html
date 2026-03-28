@@ -1763,7 +1763,10 @@ async function confirmarAgendamento() {
       method: 'POST',
       body: JSON.stringify(agendamentoData)
     });
-    
+// Remove a trava de avaliação para este profissional
+let avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '[]');
+avaliacoesFeitas = avaliacoesFeitas.filter(p => p !== profissionalSelecionado);
+localStorage.setItem('avaliacoes_feitas', JSON.stringify(avaliacoesFeitas));   
 // manda telegram
 const msg = `AGENDAMENTO\n` +
   `${dataSelecionada} ${horarioSelecionado}\n` +
