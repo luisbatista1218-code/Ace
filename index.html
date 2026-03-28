@@ -68,7 +68,7 @@ body::before {
 .profissional-item.selecionado { background: var(--accent); color: white; border-color: var(--accent); }
 .form-group { margin-bottom: 20px; }
 .form-label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--muted); }
-.form-input { width: 100%; padding: 15px; border: 2px solid var(--border); border-radius: 10px; font-size: 16px; transition: all 0.2s ease; }
+.form-input { width: 100%; padding: 15px; border: 2px solid var(--border); border-radius: 10px; font-size: 16px; transition: all 0.2s ease; background: var(--surface); color: var(--text); }
 .form-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
 .agenda-lista { display: flex; flex-direction: column; gap: 15px; }
 .item-agenda { background: var(--card); border-left: 5px solid var(--accent); border-radius: 10px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); position: relative; }
@@ -111,7 +111,6 @@ body::before {
 .lixeira-individual:hover { background: var(--red); }
 @media (max-width: 768px) { .banner-grande { height: 35vh; min-height: 250px; } .dias-grid, .semanas-grid { gap: 4px; } .dia { font-size: 14px; } .grid-servico, .config-horarios, .agendamento-item, .info-servico { grid-template-columns: 1fr; } .lixeira-individual { top: 5px; right: 5px; width: 25px; height: 25px; font-size: 14px; } }
 
-/* Fix inputs, selects e options no tema escuro */
 .form-input, select.form-input, input.form-input {
   background: var(--surface) !important;
   color: var(--text) !important;
@@ -136,7 +135,6 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
 .ticket-agendamento { background: var(--card) !important; border-color: var(--border) !important; }
 .dia-semana { color: var(--muted) !important; }
 .loading { color: var(--muted) !important; }
-/* Modal de confirmação */
 #modalExcluir > div, #modalExcluirServico > div {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
@@ -151,17 +149,12 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
 }
 .modal-admin { background: var(--card) !important; border: 1px solid var(--border); }
 .modal-admin h2 { color: var(--text) !important; font-family: 'Syne', sans-serif !important; }
-/* Barra inferior */
 .barra-inferior { background: rgba(20,23,32,.94) !important; backdrop-filter: blur(20px); border-top: 1px solid var(--border) !important; }
 .btn-nav { background: var(--card) !important; border-color: var(--border) !important; color: var(--muted) !important; }
 .btn-nav.ativo { background: rgba(79,142,247,.12) !important; color: var(--accent) !important; border-color: var(--accent) !important; }
-/* Resumo agendamento */
 #telaFormulario > div { background: var(--surface) !important; border-color: var(--border) !important; }
 #telaFormulario strong { color: var(--muted) !important; }
 #telaFormulario span { color: var(--text) !important; }
-
-
-/* Strong/bold labels nos cards escuros */
 .agendamento-item strong, .agendamento-item b,
 #profissionaisToggleContainer strong, #profissionaisToggleContainer b {
   color: var(--muted);
@@ -170,9 +163,6 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
 .agendamento-item span, #profissionaisToggleContainer span {
   color: var(--text);
 }
-/* Nome do agendamento na barra inferior — evitar corte */
-
-/* Tela dos horários de serviço */
 .horario-item {
   background: var(--card) !important;
   border-color: var(--border) !important;
@@ -183,7 +173,6 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
   border-color: var(--green) !important;
   color: var(--text) !important;
 }
-/* Profissional item */
 .profissional-item {
   background: var(--card) !important;
   border-color: var(--border) !important;
@@ -193,35 +182,29 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
   background: rgba(79,142,247,.1) !important;
   border-color: var(--accent) !important;
 }
-/* Info serviço */
 .info-servico div {
   background: var(--surface) !important;
 }
 .info-servico strong { color: var(--muted) !important; }
 .info-servico span { color: var(--text) !important; }
-/* Card serviço */
 .card-servico {
   background: var(--card) !important;
 }
-/* Ticket PDF */
 .ticket-agendamento * { color: var(--text); }
 #pdfCodigo { color: var(--accent) !important; }
-
 </style>
-
 
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#3a0060">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-
 </head>
 <body>
 <div class="banner-grande">
   <img src="banner.png" alt="Banner">
   <div class="overlay-banner">
-    <h1 style="font-size: 28px; margin-bottom: 5px; font-family: "Syne", sans-serif; font-weight: 800;">Negócio Nome</h1>
+    <h1 style="font-size: 28px; margin-bottom: 5px; font-family: 'Syne', sans-serif; font-weight: 800;">Negócio Nome</h1>
     <p style="opacity: 0.9;">Agendamento online • CREA 12345</p>
   </div>
 </div>
@@ -296,6 +279,9 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
   <div class="area-cliente" id="telaAvaliar">
     <button class="voltar-btn" onclick="voltarInicio()">← Voltar</button>
     <h2 class="titulo-secao">⭐️ Avaliar Profissional</h2>
+    <div style="margin-bottom: 20px;">
+      <button class="btn-admin" onclick="mostrarEditarAvaliacao()" style="background: var(--accent);">✏️ Editar minhas avaliações</button>
+    </div>
     <div id="listaAvaliarProfissionais"></div>
     <div id="subTelaEstrelas" style="display:none;">
       <button class="voltar-btn" onclick="voltarListaAvaliacao()">← Voltar</button>
@@ -314,6 +300,32 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
     </div>
   </div>
 
+  <!-- TELA EDITAR AVALIAÇÃO -->
+  <div class="area-cliente" id="telaEditarAvaliacao" style="display: none;">
+    <button class="voltar-btn" onclick="voltarInicio()">← Voltar</button>
+    <h2 class="titulo-secao">✏️ Editar minhas avaliações</h2>
+    
+    <div id="listaEditarAvaliacoes">
+      <div class="loading"><div class="loading-spinner"></div>Carregando...</div>
+    </div>
+    
+    <div id="subTelaEditarEstrelas" style="display: none;">
+      <button class="voltar-btn" onclick="voltarListaEditar()">← Voltar</button>
+      <div style="background:var(--card);border-radius:12px;padding:25px;border:2px solid var(--border);text-align:center;">
+        <h3 id="editarNomeProfissional" style="margin-bottom:20px;font-family:'Syne',sans-serif;color:var(--text);"></h3>
+        <p style="color:var(--muted);margin-bottom:20px;">Toque nas estrelas para alterar sua nota</p>
+        <div style="display:flex;justify-content:center;gap:12px;margin-bottom:25px;">
+          <span class="estrela-editar" data-nota="1" onclick="selecionarEstrelaEditar(1)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+          <span class="estrela-editar" data-nota="2" onclick="selecionarEstrelaEditar(2)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+          <span class="estrela-editar" data-nota="3" onclick="selecionarEstrelaEditar(3)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+          <span class="estrela-editar" data-nota="4" onclick="selecionarEstrelaEditar(4)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+          <span class="estrela-editar" data-nota="5" onclick="selecionarEstrelaEditar(5)" style="font-size:36px;cursor:pointer;opacity:0.3;">⭐</span>
+        </div>
+        <button id="btnConfirmarEdicao" class="btn-admin" onclick="confirmarEdicaoAvaliacao()" style="display:none;background:var(--green);">✅ Atualizar Avaliação</button>
+      </div>
+    </div>
+  </div>
+
   <div class="ajuda-container" id="telaAjuda">
     <button class="voltar-btn" onclick="voltarInicio()">← Voltar</button>
     <h2 class="titulo-secao">Dúvidas</h2>
@@ -324,128 +336,122 @@ h1, h2, h3 { font-family: 'Syne', sans-serif; }
   </div>
   
   <div class="admin-container" id="telaAdmin">
-  <button class="voltar-btn" onclick="sairAdmin()">← Sair do ADM</button>
-  <h2 class="titulo-secao">⚙️ Área Administrativa</h2>
-  
-<!-- PARTE 1: AGENDAMENTOS POR PROFISSIONAL - COM TRIÂNGULO NO FIXO -->
-<div style="margin-bottom: 30px; background: var(--card); border-radius: 12px; padding: 20px; border: 2px solid var(--border);">
-  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-    <h3 style="color: var(--muted); font-size: 18px; margin: 0; font-family: "Syne", sans-serif;">📋 Agendamentos</h3>
-  </div>
-  <div id="profissionaisToggleContainer"></div>
-</div>
-  
-  <!-- PARTE 2: MARCAR COMO CONCLUÍDO -->
-  <div class="form-admin" style="margin-bottom: 30px;">
-    <h3 style="color: var(--muted); margin-bottom: 20px;">✅ Marcar como Concluído</h3>
-    <div class="grid-admin">
-      <div class="form-group">
-        <label class="form-label">Profissional</label>
-        <select class="form-input" id="selectProfissionalConcluido" onchange="carregarAgendamentosPorProfissionalConcluido()">
-          <option value=""></option>
-        </select>
+    <button class="voltar-btn" onclick="sairAdmin()">← Sair do ADM</button>
+    <h2 class="titulo-secao">⚙️ Área Administrativa</h2>
+    
+    <div style="margin-bottom: 30px; background: var(--card); border-radius: 12px; padding: 20px; border: 2px solid var(--border);">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+        <h3 style="color: var(--muted); font-size: 18px; margin: 0; font-family: 'Syne', sans-serif;">📋 Agendamentos</h3>
       </div>
-      <div class="form-group">
-        <label class="form-label">Agendamento</label>
-        <select class="form-input" id="selectAgendamentoConcluido">
-          <option value=""></option>
-        </select>
-      </div>
+      <div id="profissionaisToggleContainer"></div>
     </div>
-    <div id="detalhesAgendamentoConcluido" style="display: none; background: var(--surface); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-        <div><strong>Cliente:</strong> <span id="detNomeConcluido">-</span></div>
-        <div><strong>Telefone:</strong> <span id="detTelefoneConcluido">-</span></div>
-        <div><strong>Serviço:</strong> <span id="detServicoConcluido">-</span></div>
-        <div><strong>Profissional:</strong> <span id="detProfissionalConcluido">-</span></div>
-        <div><strong>Horário:</strong> <span id="detHorarioConcluido">-</span></div>
-        <div><strong>Código:</strong> <span id="detCodigoConcluido">-</span></div>
-      </div>
-    </div>
-    <button class="btn-admin" onclick="marcarConcluidoPorProfissional()" style="background: var(--green);">✔️ Marcar como Concluído</button>
-  </div>
-  
-  <!-- PARTE 3: GERENCIAR SERVIÇOS -->
-  <div class="cadastro-servico" style="margin-bottom: 30px;">
-    <h3 style="color: var(--muted); margin-bottom: 20px;">📈 Gerenciar Serviços</h3>
-    <div class="grid-servico">
-      <div class="form-group">
-        <label class="form-label">Serviço</label>
-        <input type="text" class="form-input" id="editarServicoNome" placeholder="Nome do serviço">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Preço (R$)</label>
-        <input type="number" class="form-input" id="editarServicoPreco" placeholder="30.00" step="0.01">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Profissional</label>
-        <div style="display: flex; gap: 5px;">
-          <input type="text" class="form-input" id="editarServicoProfissional" placeholder="Digite ou selecione" style="flex: 2;">
-          <select class="form-input" id="selectProfissionalServico" style="flex: 1;" onchange="preencherProfissionalServico()">
+    
+    <div class="form-admin" style="margin-bottom: 30px;">
+      <h3 style="color: var(--muted); margin-bottom: 20px;">✅ Marcar como Concluído</h3>
+      <div class="grid-admin">
+        <div class="form-group">
+          <label class="form-label">Profissional</label>
+          <select class="form-input" id="selectProfissionalConcluido" onchange="carregarAgendamentosPorProfissionalConcluido()">
+            <option value=""></option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Agendamento</label>
+          <select class="form-input" id="selectAgendamentoConcluido">
             <option value=""></option>
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Descrição</label>
-        <input type="text" class="form-input" id="editarServicoDescricao" placeholder="Máx 40 caracteres" maxlength="40">
+      <div id="detalhesAgendamentoConcluido" style="display: none; background: var(--surface); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div><strong>Cliente:</strong> <span id="detNomeConcluido">-</span></div>
+          <div><strong>Telefone:</strong> <span id="detTelefoneConcluido">-</span></div>
+          <div><strong>Serviço:</strong> <span id="detServicoConcluido">-</span></div>
+          <div><strong>Profissional:</strong> <span id="detProfissionalConcluido">-</span></div>
+          <div><strong>Horário:</strong> <span id="detHorarioConcluido">-</span></div>
+          <div><strong>Código:</strong> <span id="detCodigoConcluido">-</span></div>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Tempo (min)</label>
-        <select class="form-input" id="editarServicoTempo">
-          <option value="30">30</option>
-          <option value="45">45</option>
-          <option value="60">60</option>
-          <option value="90">90</option>
-        </select>
-      </div>
-    </div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
-      <button class="btn-admin" onclick="adicionarServico()" style="background: linear-gradient(135deg, var(--accent), var(--accent2));">➕ Adicionar</button>
-      <button class="btn-admin" onclick="atualizarServico()" style="background: var(--accent);">✏️ Atualizar</button>
-    </div>
-    <button class="btn-admin" onclick="excluirServico()" style="background: var(--red); margin-top: 15px;">🗑️ Excluir Selecionado</button>
-  </div>
-  
-  <!-- PARTE 4: HORÁRIOS E FOLGAS -->
-  <div class="config-horarios" style="margin-bottom: 30px;">
-    <div class="config-box">
-      <h3 style="color: var(--muted); margin-bottom: 15px;">🍽️ Horário de Almoço</h3>
-      <div class="form-group"><label class="form-label">Início</label><input type="time" class="form-input" id="almocoInicio" value="12:00"></div>
-      <div class="form-group"><label class="form-label">Fim</label><input type="time" class="form-input" id="almocoFim" value="13:00"></div>
-      <button class="btn-admin" onclick="salvarConfiguracao('almoco')" style="background: var(--orange);">💾 Salvar Almoço</button>
+      <button class="btn-admin" onclick="marcarConcluidoPorProfissional()" style="background: var(--green);">✔️ Marcar como Concluído</button>
     </div>
     
-    <div class="config-box">
-      <h3 style="color: var(--muted); margin-bottom: 15px;">🏖️ Marcar Folga</h3>
-      <div class="form-group">
-        <label class="form-label">Data</label>
-        <input type="date" class="form-input" id="dataFolga">
+    <div class="cadastro-servico" style="margin-bottom: 30px;">
+      <h3 style="color: var(--muted); margin-bottom: 20px;">📈 Gerenciar Serviços</h3>
+      <div class="grid-servico">
+        <div class="form-group">
+          <label class="form-label">Serviço</label>
+          <input type="text" class="form-input" id="editarServicoNome" placeholder="Nome do serviço">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Preço (R$)</label>
+          <input type="number" class="form-input" id="editarServicoPreco" placeholder="30.00" step="0.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Profissional</label>
+          <div style="display: flex; gap: 5px;">
+            <input type="text" class="form-input" id="editarServicoProfissional" placeholder="Digite ou selecione" style="flex: 2;">
+            <select class="form-input" id="selectProfissionalServico" style="flex: 1;" onchange="preencherProfissionalServico()">
+              <option value=""></option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descrição</label>
+          <input type="text" class="form-input" id="editarServicoDescricao" placeholder="Máx 40 caracteres" maxlength="40">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tempo (min)</label>
+          <select class="form-input" id="editarServicoTempo">
+            <option value="30">30</option>
+            <option value="45">45</option>
+            <option value="60">60</option>
+            <option value="90">90</option>
+          </select>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Profissional</label>
-        <select class="form-input" id="selectProfissionalFolga">
-          <option value=""></option>
-        </select>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
+        <button class="btn-admin" onclick="adicionarServico()" style="background: linear-gradient(135deg, var(--accent), var(--accent2));">➕ Adicionar</button>
+        <button class="btn-admin" onclick="atualizarServico()" style="background: var(--accent);">✏️ Atualizar</button>
       </div>
-      <div class="form-group">
-        <label class="form-label">Motivo</label>
-        <input type="text" class="form-input" id="motivoFolga" placeholder="Folga">
-      </div> 
-      <div style="display: flex; gap: 10px;">
-        <button class="btn-admin" onclick="adicionarFolgaComProfissional()" style="background: var(--accent2);">🏖️ Salvar Folga</button>
-        <button class="btn-admin" onclick="excluirFolgaPelaData()" style="background: var(--red);">🗑️ Excluir</button>
+      <button class="btn-admin" onclick="excluirServico()" style="background: var(--red); margin-top: 15px;">🗑️ Excluir Selecionado</button>
+    </div>
+    
+    <div class="config-horarios" style="margin-bottom: 30px;">
+      <div class="config-box">
+        <h3 style="color: var(--muted); margin-bottom: 15px;">🍽️ Horário de Almoço</h3>
+        <div class="form-group"><label class="form-label">Início</label><input type="time" class="form-input" id="almocoInicio" value="12:00"></div>
+        <div class="form-group"><label class="form-label">Fim</label><input type="time" class="form-input" id="almocoFim" value="13:00"></div>
+        <button class="btn-admin" onclick="salvarConfiguracao('almoco')" style="background: var(--orange);">💾 Salvar Almoço</button>
+      </div>
+      
+      <div class="config-box">
+        <h3 style="color: var(--muted); margin-bottom: 15px;">🏖️ Marcar Folga</h3>
+        <div class="form-group">
+          <label class="form-label">Data</label>
+          <input type="date" class="form-input" id="dataFolga">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Profissional</label>
+          <select class="form-input" id="selectProfissionalFolga">
+            <option value=""></option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Motivo</label>
+          <input type="text" class="form-input" id="motivoFolga" placeholder="Folga">
+        </div> 
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-admin" onclick="adicionarFolgaComProfissional()" style="background: var(--accent2);">🏖️ Salvar Folga</button>
+          <button class="btn-admin" onclick="excluirFolgaPelaData()" style="background: var(--red);">🗑️ Excluir</button>
+        </div>
       </div>
     </div>
+    
+    <div style="margin-top: 30px;">
+      <h3 style="color: var(--muted); margin-bottom: 15px; font-size: 18px;">📋 Serviços Cadastrados (Clique para editar)</h3>
+      <div id="listaServicosAdmin"><div class="loading"><div class="loading-spinner"></div>Carregando...</div></div>
+    </div>
   </div>
-  
-  <!-- PARTE 5: LISTA DE SERVIÇOS (já existia) -->
-  <div style="margin-top: 30px;">
-    <h3 style="color: var(--muted); margin-bottom: 15px; font-size: 18px;">📋 Serviços Cadastrados (Clique para editar)</h3>
-    <div id="listaServicosAdmin"><div class="loading"><div class="loading-spinner"></div>Carregando...</div></div>
-  </div>
-  
-</div> <!-- FECHA admin-container -->
   
   <div class="pdf-container" id="telaPDF">
     <button class="voltar-btn" onclick="voltarInicio()">← Voltar</button>
@@ -506,7 +512,7 @@ async function fetchSupabase(endpoint, options = {}) {
   const adminSenha = localStorage.getItem('admin_senha');
   if (adminSenha) {
     headers['X-Admin-Password'] = adminSenha;
-  }//admin
+  }
   
   if (options.method === 'POST' || options.method === 'PATCH') {
     headers['Prefer'] = options.prefer || 'return=representation';
@@ -553,7 +559,8 @@ let configuracoes = {};
 let folgas = [];
 let servicoEditando = null;
 let clientesCache = {};
-let verAgendamento = true;
+let profissionalParaAvaliar = null;
+let notaSelecionada = null;
   
 async function carregarServicos() {
   try {
@@ -613,7 +620,6 @@ async function carregarFolgas() {
   }
 }
 
-// 🟢 FUNÇÃO 1: Carregar profissionais (SEM TÍTULO, SÓ ELES)
 async function carregarProfissionaisToggle() {
   const container = document.getElementById('profissionaisToggleContainer');
   if (!container) return;
@@ -653,7 +659,6 @@ async function carregarProfissionaisToggle() {
   container.innerHTML = html || '<p style="padding: 20px; color: var(--muted);">Nenhum agendamento</p>';
 }
 
-// 🟢 FUNÇÃO 2: Toggle do profissional
 function toggleProfissional(conteudoId, trianguloId) {
   const conteudo = document.getElementById(conteudoId);
   const triangulo = document.getElementById(trianguloId);
@@ -667,7 +672,6 @@ function toggleProfissional(conteudoId, trianguloId) {
   }
 }
 
-// 🟢 FUNÇÃO 3: Gerar HTML dos agendamentos (layout igual ao original)
 function gerarHtmlAgendamentos(agendamentosLista) {
   let html = '';
   agendamentosLista.forEach(ag => {
@@ -695,17 +699,12 @@ function gerarHtmlAgendamentos(agendamentosLista) {
   return html;
 }
 
-
-
-// 🟢 FUNÇÃO 4: Carregar select de profissionais para concluído
 function carregarSelectProfissionaisConcluido() {
   const select = document.getElementById('selectProfissionalConcluido');
   if (!select) return;
   
-  // Pega apenas agendamentos NÃO concluídos
   const agendamentosAtivos = agendamentos.filter(a => a.status !== 'concluido' && a.status !== 'cancelado');
   
-  // Pega os profissionais que têm agendamentos pendentes
   const profissionaisComAgendamentos = [];
   
   agendamentosAtivos.forEach(ag => {
@@ -724,21 +723,16 @@ function carregarSelectProfissionaisConcluido() {
     select.appendChild(option);
   });
   
-  // Se não houver profissionais com agendamentos
   if (profissionaisComAgendamentos.length === 0) {
     select.innerHTML = '<option value="">Nenhum agendamento pendente</option>';
   }
 }
 
-
 async function carregarAgendamentosPorProfissionalConcluido() {
   const selectProf = document.getElementById('selectProfissionalConcluido');
   const selectAg = document.getElementById('selectAgendamentoConcluido');
   
-  if (!selectProf || !selectAg) {
-    console.log('Selects não encontrados');
-    return;
-  }
+  if (!selectProf || !selectAg) return;
   
   const profissional = selectProf.value;
   
@@ -750,7 +744,6 @@ async function carregarAgendamentosPorProfissionalConcluido() {
   
   selectAg.innerHTML = '<option value="">Carregando...</option>';
   
-  // FILTRA SÓ OS NÃO CONCLUÍDOS (sem cancelado)
   const agendamentosFiltrados = agendamentos.filter(ag => {
     if (ag.status === 'concluido') return false;
     const servico = servicos.find(s => s.id === ag.servico_id);
@@ -777,9 +770,8 @@ async function carregarAgendamentosPorProfissionalConcluido() {
   
   selectAg.innerHTML = html;
 }
-// 🟢 FUNÇÃO 6: Marcar concluído por profissional
+
 async function marcarConcluidoPorProfissional() {
-  // USANDO O SELECT CORRETO QUE EXISTE NO HTML
   const selectAg = document.getElementById('selectAgendamentoConcluido');
   
   if (!selectAg) {
@@ -803,8 +795,6 @@ async function marcarConcluidoPorProfissional() {
     mostrarMensagem('Agendamento concluído! ✅', 'sucesso');
     await carregarAgendamentos();
     
-    // Recarrega tudo
-    //carregarTodosAgendamentos();
     carregarProfissionaisToggle();
     carregarSelectProfissionaisConcluido();
     carregarAgendamentosPorProfissionalConcluido();
@@ -818,7 +808,6 @@ async function marcarConcluidoPorProfissional() {
   }
 }
 
-// 🟢 FUNÇÃO 7: Carregar select de profissionais para serviço
 function carregarSelectProfissionais() {
   const select = document.getElementById('selectProfissionalServico');
   if (!select) return;
@@ -834,7 +823,6 @@ function carregarSelectProfissionais() {
   });
 }
 
-// 🟢 FUNÇÃO 8: Preencher input com o profissional selecionado
 function preencherProfissionalServico() {
   const select = document.getElementById('selectProfissionalServico');
   const input = document.getElementById('editarServicoProfissional');
@@ -843,7 +831,6 @@ function preencherProfissionalServico() {
   }
 }
 
-// 🟢 FUNÇÃO 9: Carregar select de profissionais para folga
 function carregarSelectProfissionaisFolga() {
   const select = document.getElementById('selectProfissionalFolga');
   if (!select) return;
@@ -859,7 +846,6 @@ function carregarSelectProfissionaisFolga() {
   });
 }
 
-// 🟢 FUNÇÃO 10: Adicionar folga com profissional específico
 async function adicionarFolgaComProfissional() {
   const data = document.getElementById('dataFolga').value;
   const motivo = document.getElementById('motivoFolga').value;
@@ -895,26 +881,6 @@ async function adicionarFolgaComProfissional() {
   } catch (error) {
     mostrarMensagem('Erro ao salvar folga', 'erro');
   }
-}
-
-// 🟢 FUNÇÃO 11: Filtrar profissionais no toggle
-function filtrarAgendamentosPorProfissional() {
-  const select = document.getElementById('selectProfissionalFiltro');
-  const profissional = select.value;
-  
-  const container = document.getElementById('profissionaisToggleContainer');
-  const divs = container.querySelectorAll('div > div');
-  
-  divs.forEach(div => {
-    if (div.querySelector('h4')) {
-      const nomeProf = div.querySelector('h4').textContent.replace('👨‍💼 ', '').split(' (')[0];
-      if (profissional && nomeProf !== profissional) {
-        div.style.display = 'none';
-      } else {
-        div.style.display = 'block';
-      }
-    }
-  });
 }
   
 async function adicionarServico() {
@@ -1000,17 +966,13 @@ async function atualizarServico() {
   }
 }
 
-
 async function excluirServico() {
   if (!servicoEditando) {
     mostrarMensagem('Selecione um serviço para excluir!', 'erro');
     return;
   }
   
-  // Mostra o nome do serviço no modal
   document.getElementById('modalServicoNome').textContent = `"${servicoEditando.nome}"`;
-  
-  // Abre o modal
   document.getElementById('modalExcluirServico').style.display = 'flex';
 }
   
@@ -1037,37 +999,6 @@ async function salvarConfiguracao(tipo) {
   }
 }
 
-async function adicionarFolga() {
-  const data = document.getElementById('dataFolga').value;
-  const motivo = document.getElementById('motivoFolga').value;
-  
-  if (!data) {
-    mostrarMensagem('Selecione uma data!', 'erro');
-    return;
-  }
-  
-  try {
-    const novaFolga = {
-      data_folga: data,
-      motivo: motivo || 'Folga'
-    };
-    
-    await fetchSupabase('folgas', {
-      method: 'POST',
-      body: JSON.stringify(novaFolga)
-    });
-    
-    mostrarMensagem('Folga salva!', 'sucesso');
-    await carregarFolgas();
-    
-    document.getElementById('dataFolga').value = '';
-    document.getElementById('motivoFolga').value = '';
-    
-  } catch (error) {
-    mostrarMensagem('Erro ao salvar folga', 'erro');
-  }
-}
-
 function mostrarTela(tela) {
   document.querySelectorAll('.container-principal > div').forEach(el => {
     el.style.display = 'none';
@@ -1084,6 +1015,7 @@ function mostrarTela(tela) {
   else if (tela === 'admin') { document.getElementById('telaAdmin').style.display = 'block'; carregarAdmin(); }
   else if (tela === 'pdf') document.getElementById('telaPDF').style.display = 'block';
   else if (tela === 'avaliar') { document.getElementById('telaAvaliar').style.display = 'block'; carregarTelaAvaliar(); }
+  else if (tela === 'editarAvaliacao') { document.getElementById('telaEditarAvaliacao').style.display = 'block'; carregarTelaEditarAvaliacao(); }
 }
 
 function voltarInicio() { mostrarTela('inicio'); }
@@ -1094,6 +1026,7 @@ function mostrarHorarios() { mostrarTela('horarios'); }
 function mostrarAreaCliente() { mostrarTela('cliente'); }
 function mostrarAjuda() { mostrarTela('ajuda'); }
 function mostrarAvaliar() { mostrarTela('avaliar'); }
+function mostrarEditarAvaliacao() { mostrarTela('editarAvaliacao'); }
 
 async function carregarServicosCliente() {
   const container = document.getElementById('listaServicosCliente');
@@ -1112,7 +1045,7 @@ async function carregarServicosCliente() {
 html += `
 <div class="card-servico" style="border-left:8px solid var(--accent);border-radius:22px;padding:18px;margin-bottom:22px;box-shadow:0 14px 34px -10px rgba(0,0,0,0.12);display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%;background: var(--card);">
 
-<div style="grid-column:1/-1;font-size:18px;font-weight:700;color:var(--text);font-family:"Syne",sans-serif;display:flex;align-items:center;gap:8px;">💆 ${servico.nome}</div>
+<div style="grid-column:1/-1;font-size:18px;font-weight:700;color:var(--text);font-family:'Syne',sans-serif;display:flex;align-items:center;gap:8px;">💆 ${servico.nome}</div>
 
 ${servico.descricao ? `<div style="grid-column:1/-1;font-size:13px;color:var(--text);line-height:1.5;background:rgba(255,255,255,0.06);opacity:1;padding:12px;border-radius:12px;">${servico.descricao}</div>` : ""}
 
@@ -1231,9 +1164,7 @@ function selecionarData(data) {
   mostrarTela('profissionais');
 }
 
-
-
- async function carregarProfissionais() {
+async function carregarProfissionais() {
   const container = document.getElementById('listaProfissionais');
   container.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
   
@@ -1247,7 +1178,6 @@ function selecionarData(data) {
     await carregarServicos();
     await carregarFolgas();
     
-    // ✅ CORREÇÃO: Verifica APENAS folga GERAL (sem profissional)
     const temFolgaGeral = folgas.some(f => f.data_folga === dataSelecionada && f.profissional === null);
     
     if (temFolgaGeral) {
@@ -1277,11 +1207,9 @@ function selecionarData(data) {
         `<div style="margin-bottom: 5px;"><strong>${s.nome}</strong> - ${s.tempo_minutos}min (R$ ${s.preco.toFixed(2)})</div>`
       ).join('');
       
-      // ✅ VERIFICA SE ESTE PROFISSIONAL TEM FOLGA ESPECÍFICA
       const temFolgaProfissional = folgas.some(f => f.data_folga === dataSelecionada && f.profissional === profissional);
       
       if (temFolgaProfissional) {
-        // PROFISSIONAL DE FOLGA: VERMELHO E SEM CLIQUE (layout original preservado)
         html += `
           <div class="profissional-item" style="background: #fee2e2; border-color: var(--red); opacity: 0.7; cursor: not-allowed;" title="Este profissional está de folga">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -1296,7 +1224,6 @@ function selecionarData(data) {
           </div>
         `;
       } else {
-        // PROFISSIONAL NORMAL (layout original)
         html += `
           <div class="profissional-item" onclick="selecionarProfissional('${profissional}')">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -1318,6 +1245,7 @@ function selecionarData(data) {
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--red);">⚠️<br><h3>Erro</h3></div>';
   }
 } 
+
 function selecionarProfissional(profissional) {
   profissionalSelecionado = profissional;
   document.querySelectorAll('.profissional-item').forEach(item => item.classList.remove('selecionado'));
@@ -1345,6 +1273,7 @@ function selecionarServicoDoProfissional() {
   document.getElementById('listaHorarios').innerHTML = html;
   mostrarTela('horarios');
 }
+
 async function carregarHorarios() {
   const container = document.getElementById('listaHorarios');
   container.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
@@ -1358,7 +1287,6 @@ async function carregarHorarios() {
   try {
     await Promise.all([carregarAgendamentos(), carregarConfiguracoes(), carregarFolgas()]);
     
-    // VERIFICAÇÕES DE FOLGA
     const folgaGeral = folgas.find(f => f.data_folga === dataSelecionada && f.profissional === null);
     if (folgaGeral) {
       container.innerHTML = `
@@ -1388,7 +1316,6 @@ async function carregarHorarios() {
       return;
     }
     
-    // SE NÃO TIVER FOLGA, MOSTRA OS SERVIÇOS
     const servicosDoProfissional = servicos.filter(s => s.profissional === profissionalSelecionado);
     
     if (servicosDoProfissional.length === 0) {
@@ -1416,7 +1343,6 @@ async function carregarHorarios() {
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--red);">⚠️<br><h3>Erro ao carregar</h3></div>';
   }
 }
-
 
 function selecionarServicoEHorario(servicoId) {
   servicoSelecionado = servicos.find(s => s.id === servicoId);
@@ -1484,8 +1410,7 @@ async function mostrarHorariosDisponiveis() {
       const hoje = new Date();
       const hojeFormatado = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
       const eHoje = dataSelecionada === hojeFormatado;
-      //const horarioPassado = eHoje && new Date(`2000-01-01T${horarioInicio}`) < new Date();
-const horarioPassado = eHoje && horarioInicio <= new Date().toTimeString().slice(0,5);
+      const horarioPassado = eHoje && horarioInicio <= new Date().toTimeString().slice(0,5);
       const disponivel = !conflitaAlmoco && !conflitoAgendamento && !horarioPassado;
       
       horarios.push({
@@ -1552,7 +1477,6 @@ function finalizarSelecaoServico(servicoId) {
 async function enviarTelegram(mensagem) {
   const BOT_TOKEN = '';
   const CHAT_ID = '';
-  // TRAVA PRA NÃO ENVIAR REPETIDO
   if (window.ultimaMensagem === mensagem) {
     console.log('Mensagem duplicada ignorada');
     return;
@@ -1574,10 +1498,9 @@ async function enviarTelegram(mensagem) {
   }
 }
 
-  async function verificarLimiteDiario(telefone, data) {
+async function verificarLimiteDiario(telefone, data) {
   const tel = telefone.replace(/\D/g, '');
   
-  // CONTA QUANTOS AGENDAMENTOS DESSE TELEFONE NESSA DATA
   const agendamentos = await fetchSupabase(
     `agenda?telefone=eq.${tel}&data_agendamento=eq.${data}&select=id`
   );
@@ -1617,7 +1540,6 @@ async function confirmarAgendamento() {
   }
 
   try {
-    // Verifica se já existe agendamento nessa data + horário
     const agExistente = await fetchSupabase(
       `agenda?data_agendamento=eq.${dataSelecionada}&horario=eq.${horarioSelecionado}&status=eq.confirmado&select=id`
     );
@@ -1657,7 +1579,6 @@ async function confirmarAgendamento() {
       body: JSON.stringify(agendamentoData)
     });
     
-// manda telegram
 const msg = `AGENDAMENTO\n` +
   `${dataSelecionada} ${horarioSelecionado}\n` +
   `${nome} - ${telefone}\n` +
@@ -1665,14 +1586,13 @@ const msg = `AGENDAMENTO\n` +
   `R$ ${servicoSelecionado.preco.toFixed(2)}\n` +
   `Cod: ${agendamentoData.codigo_confirmacao}`;
 enviarTelegram(msg);
-// 🔥 PEGAR O ID QUE O BANCO GEROU!
 const agendamentos = await fetchSupabase('agenda?select=id&order=created_at.desc&limit=1');
 const agendamentoId = agendamentos[0].id; 
 
 localStorage.setItem('cliente_telefone', telefone);
 
 const comprovante = {
-  id: agendamentoId, // ✅ AGORA É O ID DO BANCO!
+  id: agendamentoId,
   cliente: nome,
   telefone: telefone,
   servico: servicoSelecionado.nome,
@@ -1680,7 +1600,7 @@ const comprovante = {
   data: dataSelecionada,
   horario: horarioSelecionado,
   valor: servicoSelecionado.preco,
-  codigo: agendamentoData.codigo_confirmacao, // ✅ "G1WTGS74" vai aqui
+  codigo: agendamentoData.codigo_confirmacao,
   status: 'confirmado'
 };
 
@@ -1690,7 +1610,7 @@ if (comprovantes) {
 } else {
   comprovantes = [];
 }
-comprovantes.unshift(comprovante); // adiciona no início
+comprovantes.unshift(comprovante);
 localStorage.setItem('todos_comprovantes', JSON.stringify(comprovantes));
     
     const [ano, mes, dia] = dataSelecionada.split('-').map(Number);
@@ -1727,7 +1647,6 @@ async function carregarAgendaCliente() {
   container.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
   
   try {
-    // 1️⃣ PEGAR TELEFONE DO LOCALSTORAGE
     const telefone = localStorage.getItem('cliente_telefone');
     
     if (!telefone) {
@@ -1742,19 +1661,12 @@ async function carregarAgendaCliente() {
       return;
     }
 
-    // 2️⃣ LIMPAR TELEFONE (só números)
     const telefoneLimpo = telefone.replace(/\D/g, '');
     
-    console.log('🔍 Buscando agendamentos para telefone:', telefoneLimpo);
-
-    // 3️⃣ BUSCAR AGENDAMENTOS SOMENTE DA TABELA AGENDA
     const agendamentos = await fetchSupabase(
       `agenda?telefone=eq.${telefoneLimpo}&order=data_agendamento.desc,horario.desc`
     );
 
-    console.log('📋 Agendamentos encontrados:', agendamentos);
-
-    // 4️⃣ SE NÃO ENCONTROU NADA
     if (!agendamentos || agendamentos.length === 0) {
       container.innerHTML = `
         <div style="text-align: center; padding: 40px;">
@@ -1767,18 +1679,14 @@ async function carregarAgendaCliente() {
       return;
     }
 
-    // 5️⃣ CARREGAR SERVIÇOS (para pegar nomes)
     await carregarServicos();
 
-    // 6️⃣ MONTAR HTML
     let html = `<p style="margin-bottom: 20px;">📱 Telefone: <strong>${telefoneLimpo}</strong></p>`;
     
     for (const ag of agendamentos) {
-      // Buscar serviço
       const servico = servicos.find(s => s.id === ag.servico_id);
       if (!servico) continue;
       
-      // Formatar data
       const [ano, mes, dia] = ag.data_agendamento.split('-');
       const dataFormatada = `${dia}/${mes}/${ano}`;
       
@@ -1835,21 +1743,17 @@ async function carregarAgendaCliente() {
   }
 }
 
-                     
 async function apagarAgendamentoIndividual(agendamentoId, origem) {
   try {
-    // telegram
     const resultado = await fetchSupabase(`agenda?id=eq.${agendamentoId}&select=codigo_confirmacao`);
     const codigo = resultado[0]?.codigo_confirmacao;
     
     await fetchSupabase(`agenda?id=eq.${agendamentoId}`, {
       method: 'DELETE'
     });
-    //telegram
     const acao = origem === 'cliente' ? 'CLIENTE' : 'ADMIN';
     const msg = `❌ CANCELOU\nCódigo: ${codigo}\nQuem: ${acao}`;
     await enviarTelegram(msg);
-// Remover da lista de comprovantes
     let comprovantes = localStorage.getItem('todos_comprovantes');
     if (comprovantes) {
       let lista = JSON.parse(comprovantes);
@@ -1876,7 +1780,6 @@ async function apagarAgendamentoIndividual(agendamentoId, origem) {
   }
 }
   
-    
 async function excluirFolgaPelaData() {
   const data = document.getElementById('dataFolga').value;
   if (!data) return mostrarMensagem('Selecione uma data!','erro');
@@ -1892,7 +1795,6 @@ async function excluirFolgaPelaData() {
   }
 }
 
-  
 const ADMIN_SESSION_KEY = 'admin_session';
 
 function verificarSessaoAdmin() {
@@ -1915,7 +1817,6 @@ function criarSessaoAdmin(manterConectado) {
 function sairAdmin() {
   localStorage.removeItem(ADMIN_SESSION_KEY);
   document.getElementById('btnAdmin').innerHTML = '⚙️ ADM';
-  
   mostrarTela('inicio');
 }
 
@@ -1938,18 +1839,15 @@ async function entrarAdmin() {
   const manterConectado = document.getElementById('manterConectado').checked;
   
   try {
-    
     const dados = await fetchSupabase('dono1?select=codigo_admin');
     const codigoCorreto = dados[0]?.codigo_admin;
     localStorage.setItem('admin_senha', codigo);
-
 
     if (codigo === codigoCorreto) {
       criarSessaoAdmin(manterConectado);
       fecharLoginAdmin();
       mostrarTela('admin');
       mostrarMensagem('Acesso concedido! 👑', 'sucesso');
-
     } else {
       mostrarMensagem('Código inválido!', 'erro');
     }
@@ -1958,17 +1856,12 @@ async function entrarAdmin() {
   }
 }
 
-
 async function carregarAdmin() {
   if (!verificarSessaoAdmin()) { mostrarLoginAdmin(); return; }
-
-  // 🚫 REMOVI as linhas que mexiam com todosAgendamentos e trianguloGeral
-  // (já que você removeu eles do HTML)
   
   try {
     await Promise.all([carregarAgendamentos(), carregarServicos(), carregarConfiguracoes(), carregarFolgas(), carregarClientes()]);
     
-    // ✅ SÓ ISSO AQUI É O QUE IMPORTA AGORA
     await carregarProfissionaisToggle(); 
     
     carregarSelectProfissionais();
@@ -1988,10 +1881,6 @@ async function carregarAdmin() {
     mostrarMensagem('Erro ao carregar admin', 'erro');
   }
 }
-
-
-
-
 
 function carregarServicosAdmin() {
   const container = document.getElementById('listaServicosAdmin');
@@ -2048,22 +1937,341 @@ function mostrarMensagem(texto, tipo) {
   }, 5000);
 }
 
-// ========== VARIÁVEIS E FUNÇÃO DO MODAL ==========
+// ========== AVALIAÇÕES ==========
+
+async function carregarTelaAvaliar() {
+  const lista = document.getElementById('listaAvaliarProfissionais');
+  const subTela = document.getElementById('subTelaEstrelas');
+  subTela.style.display = 'none';
+  lista.style.display = 'block';
+  lista.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
+
+  try {
+    await carregarServicos();
+    const profissionaisUnicos = [...new Set(servicos.map(s => s.profissional).filter(Boolean))];
+
+    if (profissionaisUnicos.length === 0) {
+      lista.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Nenhum profissional encontrado</div>';
+      return;
+    }
+
+    const telefoneLimpo = (localStorage.getItem('cliente_telefone') || '').replace(/\D/g, '');
+
+    let html = '';
+    for (const prof of profissionaisUnicos) {
+      const servicoRef = servicos.find(s => s.profissional === prof);
+      let notas = [];
+      try { notas = JSON.parse(servicoRef?.avaliacoes || '[]'); } catch(e) {}
+
+      if (notas.length > 0 && typeof notas[0] !== 'object') {
+        notas = notas.map(n => ({ tel: null, nota: Number(n) }));
+      }
+
+      let mediaHtml = '';
+      if (notas.length > 0) {
+        const media = (notas.reduce((a, b) => a + b.nota, 0) / notas.length).toFixed(1);
+        mediaHtml = `<div style="margin-top:4px;color:var(--orange);font-size:13px;">⭐ ${media} <span style="color:var(--muted);font-size:11px;">(${notas.length} avaliações)</span></div>`;
+      }
+
+      const minhaAvaliacao = notas.find(n => n.tel === telefoneLimpo);
+      let minhaNotaHtml = '';
+      if (minhaAvaliacao) {
+        minhaNotaHtml = `<div style="margin-top:2px;color:var(--muted);font-size:12px;">Sua nota: ${'⭐'.repeat(minhaAvaliacao.nota)}</div>`;
+      }
+
+      const jaAvaliou = !!minhaAvaliacao;
+      html += `
+        <div class="profissional-item" onclick="abrirAvaliarProfissional('${prof}')">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:17px;font-weight:700;color:var(--text);">👨‍💼 ${prof}</div>
+              ${mediaHtml}${minhaNotaHtml}
+            </div>
+            <div style="color:${jaAvaliou ? 'var(--orange)' : 'var(--accent)'};font-size:13px;font-weight:600;">${jaAvaliou ? '✏️ Editar' : '→'}</div>
+          </div>
+        </div>`;
+    }
+
+    lista.innerHTML = html;
+  } catch(e) {
+    lista.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red);">⚠️ Erro ao carregar</div>';
+  }
+}
+
+function abrirAvaliarProfissional(profissional) {
+  profissionalParaAvaliar = profissional;
+  notaSelecionada = null;
+
+  document.getElementById('avaliarNomeProfissional').textContent = '👨‍💼 ' + profissional;
+  document.getElementById('btnConfirmarAvaliacao').style.display = 'none';
+  document.getElementById('btnConfirmarAvaliacao').disabled = false;
+  document.getElementById('btnConfirmarAvaliacao').textContent = '✅ Confirmar Avaliação';
+
+  const telefoneLimpo = (localStorage.getItem('cliente_telefone') || '').replace(/\D/g, '');
+  const servicoRef = servicos.find(s => s.profissional === profissional);
+  let notas = [];
+  try { notas = JSON.parse(servicoRef?.avaliacoes || '[]'); } catch(e) {}
+  if (notas.length > 0 && typeof notas[0] !== 'object') {
+    notas = notas.map(n => ({ tel: null, nota: Number(n) }));
+  }
+  const minhaAvaliacao = notas.find(n => n.tel === telefoneLimpo);
+
+  if (minhaAvaliacao) {
+    notaSelecionada = minhaAvaliacao.nota;
+    document.querySelectorAll('.estrela-avaliacao').forEach(e => {
+      e.style.opacity = parseInt(e.dataset.nota) <= minhaAvaliacao.nota ? '1' : '0.3';
+    });
+    document.getElementById('btnConfirmarAvaliacao').style.display = 'block';
+  } else {
+    document.querySelectorAll('.estrela-avaliacao').forEach(e => e.style.opacity = '0.3');
+  }
+
+  document.getElementById('listaAvaliarProfissionais').style.display = 'none';
+  document.getElementById('subTelaEstrelas').style.display = 'block';
+}
+
+function voltarListaAvaliacao() {
+  document.getElementById('subTelaEstrelas').style.display = 'none';
+  document.getElementById('listaAvaliarProfissionais').style.display = 'block';
+  profissionalParaAvaliar = null;
+  notaSelecionada = null;
+}
+
+function selecionarEstrela(nota) {
+  notaSelecionada = nota;
+  document.querySelectorAll('.estrela-avaliacao').forEach(e => {
+    e.style.opacity = parseInt(e.dataset.nota) <= nota ? '1' : '0.3';
+  });
+  document.getElementById('btnConfirmarAvaliacao').style.display = 'block';
+}
+
+async function confirmarAvaliacao() {
+  if (!profissionalParaAvaliar || !notaSelecionada) return;
+
+  const btn = document.getElementById('btnConfirmarAvaliacao');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+
+  try {
+    const telefone = localStorage.getItem('cliente_telefone');
+    if (!telefone) {
+      mostrarMensagem('Faça um agendamento primeiro para avaliar!', 'erro');
+      btn.disabled = false;
+      btn.textContent = '✅ Confirmar Avaliação';
+      return;
+    }
+    const telefoneLimpo = telefone.replace(/\D/g, '');
+
+    const ags = await fetchSupabase(`agenda?telefone=eq.${telefoneLimpo}&select=servico_id`);
+    await carregarServicos();
+    const profissionaisDoCliente = (ags || []).map(ag => {
+      const s = servicos.find(sv => sv.id === ag.servico_id);
+      return s ? s.profissional : null;
+    }).filter(Boolean);
+
+    if (!profissionaisDoCliente.includes(profissionalParaAvaliar)) {
+      mostrarMensagem('Você precisa ter agendado com este profissional para avaliar!', 'erro');
+      btn.disabled = false;
+      btn.textContent = '✅ Confirmar Avaliação';
+      return;
+    }
+
+    const servicosDoProf = servicos.filter(s => s.profissional === profissionalParaAvaliar);
+    if (servicosDoProf.length === 0) throw new Error('Profissional não encontrado');
+
+    let notas = [];
+    try { notas = JSON.parse(servicosDoProf[0].avaliacoes || '[]'); } catch(e) {}
+
+    if (notas.length > 0 && typeof notas[0] !== 'object') {
+      notas = notas.map(n => ({ tel: null, nota: Number(n) }));
+    }
+
+    const jaAvaliou = notas.some(n => n.tel === telefoneLimpo);
+
+    notas = notas.filter(n => n.tel !== telefoneLimpo);
+    notas.push({ tel: telefoneLimpo, nota: Number(notaSelecionada) });
+
+    for (const sv of servicosDoProf) {
+      await fetchSupabase(`servicos?id=eq.${sv.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ avaliacoes: JSON.stringify(notas) })
+      });
+    }
+
+    mostrarMensagem(jaAvaliou ? 'Avaliação atualizada! ⭐' : 'Avaliação enviada! ⭐', 'sucesso');
+    voltarListaAvaliacao();
+    await carregarTelaAvaliar();
+  } catch(e) {
+    mostrarMensagem('Erro ao salvar avaliação', 'erro');
+    btn.disabled = false;
+    btn.textContent = '✅ Confirmar Avaliação';
+  }
+}
+
+// ========== EDIÇÃO DE AVALIAÇÕES ==========
+
+async function carregarTelaEditarAvaliacao() {
+  const telefone = localStorage.getItem('cliente_telefone');
+  if (!telefone) {
+    mostrarMensagem('Faça um agendamento primeiro!', 'erro');
+    mostrarTela('inicio');
+    return;
+  }
+  
+  const telefoneLimpo = telefone.replace(/\D/g, '');
+  const container = document.getElementById('listaEditarAvaliacoes');
+  if (!container) return;
+  
+  container.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
+  document.getElementById('subTelaEditarEstrelas').style.display = 'none';
+  document.getElementById('listaEditarAvaliacoes').style.display = 'block';
+  
+  try {
+    await carregarServicos();
+    const profissionaisUnicos = [...new Set(servicos.map(s => s.profissional).filter(Boolean))];
+    
+    let html = '<div style="margin-bottom: 20px;"><button class="btn-admin" onclick="mostrarAvaliar()" style="background: var(--accent); margin-bottom: 20px;">⭐ Avaliar novo profissional</button></div>';
+    let temAvaliacao = false;
+    
+    for (const prof of profissionaisUnicos) {
+      const servicoRef = servicos.find(s => s.profissional === prof);
+      let notas = [];
+      try { notas = JSON.parse(servicoRef?.avaliacoes || '[]'); } catch(e) {}
+      
+      if (notas.length > 0 && typeof notas[0] !== 'object') {
+        notas = notas.map(n => ({ tel: null, nota: Number(n) }));
+      }
+      
+      const minhaAvaliacao = notas.find(n => n.tel === telefoneLimpo);
+      
+      if (minhaAvaliacao) {
+        temAvaliacao = true;
+        html += `
+          <div class="profissional-item" onclick="abrirEditarAvaliacao('${prof}', ${minhaAvaliacao.nota})">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:17px;font-weight:700;color:var(--text);">👨‍💼 ${prof}</div>
+                <div style="margin-top:6px;color:var(--orange);font-size:14px;">
+                  Sua nota atual: ${'⭐'.repeat(minhaAvaliacao.nota)}
+                </div>
+              </div>
+              <div style="color:var(--accent);font-size:14px;font-weight:600;">✏️ Editar</div>
+            </div>
+          </div>
+        `;
+      }
+    }
+    
+    if (!temAvaliacao) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:40px;">
+          <div style="font-size:48px;margin-bottom:15px;">⭐️</div>
+          <h3 style="margin-bottom:15px;">Você ainda não avaliou ninguém</h3>
+          <button class="btn-admin" onclick="mostrarAvaliar()" style="background: var(--accent);">Avaliar agora</button>
+        </div>
+      `;
+    } else {
+      container.innerHTML = html;
+    }
+    
+  } catch(e) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red);">⚠️ Erro ao carregar</div>';
+  }
+}
+
+function abrirEditarAvaliacao(profissional, notaAtual) {
+  profissionalParaAvaliar = profissional;
+  notaSelecionada = notaAtual;
+  
+  document.getElementById('editarNomeProfissional').textContent = '👨‍💼 ' + profissional;
+  document.getElementById('btnConfirmarEdicao').style.display = 'block';
+  document.getElementById('btnConfirmarEdicao').disabled = false;
+  document.getElementById('btnConfirmarEdicao').textContent = '✅ Atualizar Avaliação';
+  
+  document.querySelectorAll('.estrela-editar').forEach(e => {
+    e.style.opacity = parseInt(e.dataset.nota) <= notaAtual ? '1' : '0.3';
+  });
+  
+  document.getElementById('listaEditarAvaliacoes').style.display = 'none';
+  document.getElementById('subTelaEditarEstrelas').style.display = 'block';
+}
+
+function selecionarEstrelaEditar(nota) {
+  notaSelecionada = nota;
+  document.querySelectorAll('.estrela-editar').forEach(e => {
+    e.style.opacity = parseInt(e.dataset.nota) <= nota ? '1' : '0.3';
+  });
+  document.getElementById('btnConfirmarEdicao').style.display = 'block';
+}
+
+function voltarListaEditar() {
+  document.getElementById('subTelaEditarEstrelas').style.display = 'none';
+  document.getElementById('listaEditarAvaliacoes').style.display = 'block';
+  profissionalParaAvaliar = null;
+}
+
+async function confirmarEdicaoAvaliacao() {
+  if (!profissionalParaAvaliar || !notaSelecionada) return;
+  
+  const btn = document.getElementById('btnConfirmarEdicao');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+  
+  try {
+    const telefone = localStorage.getItem('cliente_telefone');
+    if (!telefone) {
+      mostrarMensagem('Faça um agendamento primeiro!', 'erro');
+      btn.disabled = false;
+      btn.textContent = '✅ Atualizar Avaliação';
+      return;
+    }
+    const telefoneLimpo = telefone.replace(/\D/g, '');
+    
+    const servicosDoProf = servicos.filter(s => s.profissional === profissionalParaAvaliar);
+    if (servicosDoProf.length === 0) throw new Error('Profissional não encontrado');
+    
+    for (const sv of servicosDoProf) {
+      let notas = [];
+      try { notas = JSON.parse(sv.avaliacoes || '[]'); } catch(e) {}
+      
+      if (notas.length > 0 && typeof notas[0] !== 'object') {
+        notas = notas.map(n => ({ tel: null, nota: Number(n) }));
+      }
+      
+      notas = notas.filter(n => n.tel !== telefoneLimpo);
+      notas.push({ tel: telefoneLimpo, nota: Number(notaSelecionada) });
+      
+      await fetchSupabase(`servicos?id=eq.${sv.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ avaliacoes: JSON.stringify(notas) })
+      });
+    }
+    
+    mostrarMensagem('Avaliação atualizada com sucesso! ⭐', 'sucesso');
+    voltarListaEditar();
+    await carregarTelaEditarAvaliacao();
+    await carregarTelaAvaliar();
+    
+  } catch(e) {
+    mostrarMensagem('Erro ao atualizar avaliação', 'erro');
+    btn.disabled = false;
+    btn.textContent = '✅ Atualizar Avaliação';
+  }
+}
+
+// ========== MODAL DE EXCLUSÃO ==========
 let idParaExcluir = null;
 let origemParaExcluir = null;
-let servicoIdParaExcluir = null;
   
 window.abrirModalExclusao = function(agendamentoId, origem) {
   idParaExcluir = agendamentoId;
   origemParaExcluir = origem;
   document.getElementById('modalExcluir').style.display = 'flex';
-}// modal
+}
   
 document.addEventListener('DOMContentLoaded', async () => {
   const hoje = new Date();
-  const hojeFormatado = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
   
-//  dataSelecionada = hojeFormatado;
   mesAtual = hoje.getMonth();
   anoAtual = hoje.getFullYear();
   
@@ -2078,9 +2286,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   mostrarTela('inicio');
   
-  // ========== BOTÕES DO MODAL ==========
-  
-  // BOTÃO CONFIRMAR
   const btnConfirmar = document.getElementById('btnConfirmarExclusao');
   if (btnConfirmar) {
     btnConfirmar.addEventListener('click', async function() {
@@ -2092,7 +2297,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   
-  // BOTÃO CANCELAR
   const btnCancelar = document.getElementById('btnCancelarExclusao');
   if (btnCancelar) {
     btnCancelar.addEventListener('click', function() {
@@ -2101,64 +2305,54 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   
-
-// BOTÃO CONFIRMAR EXCLUSÃO DE SERVIÇO
-const btnConfirmarExclusaoServico = document.getElementById('btnConfirmarExclusaoServico');
-if (btnConfirmarExclusaoServico) {
-  btnConfirmarExclusaoServico.addEventListener('click', async function() {
-    if (servicoEditando) {
-      try {
-        await fetchSupabase(`servicos?id=eq.${servicoEditando.id}`, {
-          method: 'DELETE'
-        });
-        
-        mostrarMensagem('Serviço excluído!', 'sucesso');
-        await carregarServicos();
-        carregarServicosCliente();
-        carregarServicosAdmin();
-        
-        document.getElementById('editarServicoNome').value = '';
-        document.getElementById('editarServicoPreco').value = '';
-        servicoEditando = null;
-        
-      } catch (error) {
-        mostrarMensagem('Erro ao excluir serviço', 'erro');
+  const btnConfirmarExclusaoServico = document.getElementById('btnConfirmarExclusaoServico');
+  if (btnConfirmarExclusaoServico) {
+    btnConfirmarExclusaoServico.addEventListener('click', async function() {
+      if (servicoEditando) {
+        try {
+          await fetchSupabase(`servicos?id=eq.${servicoEditando.id}`, {
+            method: 'DELETE'
+          });
+          
+          mostrarMensagem('Serviço excluído!', 'sucesso');
+          await carregarServicos();
+          carregarServicosCliente();
+          carregarServicosAdmin();
+          
+          document.getElementById('editarServicoNome').value = '';
+          document.getElementById('editarServicoPreco').value = '';
+          servicoEditando = null;
+          
+        } catch (error) {
+          mostrarMensagem('Erro ao excluir serviço', 'erro');
+        }
       }
-    }
-    
-    document.getElementById('modalExcluirServico').style.display = 'none';
-  });
-}
-
-// BOTÃO CANCELAR EXCLUSÃO DE SERVIÇO
-const btnCancelarExclusaoServico = document.getElementById('btnCancelarExclusaoServico');
-if (btnCancelarExclusaoServico) {
-  btnCancelarExclusaoServico.addEventListener('click', function() {
-    document.getElementById('modalExcluirServico').style.display = 'none';
-  });
-}
-
-  // CLICAR FORA FECHA AMBOS OS MODAIS
+      
+      document.getElementById('modalExcluirServico').style.display = 'none';
+    });
+  }
+  
+  const btnCancelarExclusaoServico = document.getElementById('btnCancelarExclusaoServico');
+  if (btnCancelarExclusaoServico) {
+    btnCancelarExclusaoServico.addEventListener('click', function() {
+      document.getElementById('modalExcluirServico').style.display = 'none';
+    });
+  }
+  
   window.addEventListener('click', function(e) {
-    // Modal de agendamento
     const modalAgendamento = document.getElementById('modalExcluir');
     if (e.target === modalAgendamento) {
       modalAgendamento.style.display = 'none';
       idParaExcluir = null;
     }
-    // Modal de serviço
     const modalServico = document.getElementById('modalExcluirServico');
     if (e.target === modalServico) {
       modalServico.style.display = 'none';
       servicoIdParaExcluir = null;
     }
   });
-  // fim
 });
- 
 </script>
-
-
 
 <!-- MODAL DE CONFIRMAÇÃO -->
 <div id="modalExcluir" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); align-items: center; justify-content: center; z-index: 9999;">
@@ -2172,6 +2366,7 @@ if (btnCancelarExclusaoServico) {
     </div>
   </div>
 </div>
+
 <!-- MODAL DE EXCLUSÃO DE SERVIÇO -->
 <div id="modalExcluirServico" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); align-items: center; justify-content: center; z-index: 9999;">
   <div style="background: var(--card); border-radius: 20px; padding: 30px; width: 300px; height: 280px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
