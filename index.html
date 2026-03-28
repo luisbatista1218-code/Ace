@@ -2075,7 +2075,7 @@ async function carregarTelaAvaliar() {
   lista.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
 
   try {
-    if (!servicos.length) await carregarServicos();
+    await carregarServicos();
     
     const profissionais = [...new Set(servicos.map(s => s.profissional).filter(Boolean))];
     
@@ -2090,29 +2090,30 @@ async function carregarTelaAvaliar() {
     for (const prof of profissionais) {
       const servicosDoProf = servicos.filter(s => s.profissional === prof);
       
-      // Junta todas as notas
+      // Junta todas as notas (formato [5,4,3] etc)
       let todasNotas = [];
       for (const sv of servicosDoProf) {
-        try {
-          const notas = JSON.parse(sv.avaliacoes || '[]');
-          if (notas.length) todasNotas.push(...notas);
-        } catch(e) {}
+        if (sv.avaliacoes) {
+          try {
+            const notas = JSON.parse(sv.avaliacoes);
+            if (Array.isArray(notas)) {
+              todasNotas.push(...notas);
+            }
+          } catch(e) {}
+        }
       }
       
-      // Média
+      // Calcula média
       let mediaHtml = '';
-      if (todasNotas.length) {
+      if (todasNotas.length > 0) {
         const soma = todasNotas.reduce((a, b) => a + b, 0);
         const media = (soma / todasNotas.length).toFixed(1);
         mediaHtml = `<div style="color:var(--orange);font-size:12px;">⭐ ${media} (${todasNotas.length})</div>`;
       }
       
-      // Nota do usuário
-      const minhaNota = todasNotas.find(n => n === Number(telefone) || (typeof n === 'object' && n.tel === telefone)) || 
-                        (todasNotas.find(n => n.tel === telefone));
-      
-      const notaValor = typeof minhaNota === 'object' ? minhaNota.nota : minhaNota;
-      const jaAvaliou = !!minhaNota;
+      // Verifica se usuário já avaliou
+      const jaAvaliou = todasNotas.includes(Number(telefone)) || 
+                        todasNotas.some(n => typeof n === 'object' && n.tel === telefone);
       
       html += `
         <div class="profissional-item" onclick="abrirAvaliarProfissional('${prof.replace(/'/g, "\\'")}')">
@@ -2120,7 +2121,7 @@ async function carregarTelaAvaliar() {
             <div>
               <div style="font-weight:700;">👨‍💼 ${prof}</div>
               ${mediaHtml}
-              ${jaAvaliou ? `<div style="color:var(--orange);font-size:12px;">Sua nota: ${'⭐'.repeat(notaValor)}</div>` : ''}
+              ${jaAvaliou ? '<div style="color:var(--orange);font-size:12px;">✓ Você já avaliou</div>' : ''}
             </div>
             <div style="color:${jaAvaliou ? 'var(--orange)' : 'var(--accent)'};">${jaAvaliou ? '✏️ Editar' : '→'}</div>
           </div>
@@ -2128,11 +2129,12 @@ async function carregarTelaAvaliar() {
       `;
     }
     lista.innerHTML = html;
+    
   } catch(e) {
-    lista.innerHTML = '<div style="text-align:center;padding:40px;color:red;">Erro</div>';
+    console.error('ERRO:', e);
+    lista.innerHTML = '<div style="text-align:center;padding:40px;color:red;">Erro: ' + e.message + '</div>';
   }
 }
-
 function abrirAvaliarProfissional(profissional) {
   profissionalParaAvaliar = profissional;
   
