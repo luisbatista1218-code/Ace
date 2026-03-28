@@ -2047,14 +2047,17 @@ function mostrarMensagem(texto, tipo) {
     if (mensagem.parentElement) mensagem.remove();
   }, 5000);
 }
-// ========== FUNÇÕES DE AVALIAÇÃO ==========
+// ========== AVALIAÇÕES ==========
 let profissionalParaAvaliar = null;
 let notaSelecionada = null;
 
 function voltarListaAvaliacao() {
-  document.getElementById('subTelaEstrelas').style.display = 'none';
-  document.getElementById('listaAvaliarProfissionais').style.display = 'block';
+  const subTela = document.getElementById('subTelaEstrelas');
+  const lista = document.getElementById('listaAvaliarProfissionais');
+  if (subTela) subTela.style.display = 'none';
+  if (lista) lista.style.display = 'block';
   profissionalParaAvaliar = null;
+  notaSelecionada = null;
 }
 
 function selecionarEstrela(nota) {
@@ -2063,14 +2066,16 @@ function selecionarEstrela(nota) {
   estrelas.forEach(e => {
     e.style.opacity = parseInt(e.dataset.nota) <= nota ? '1' : '0.3';
   });
-  document.getElementById('btnConfirmarAvaliacao').style.display = 'block';
+  const btn = document.getElementById('btnConfirmarAvaliacao');
+  if (btn) btn.style.display = 'block';
 }
 
 async function carregarTelaAvaliar() {
   const lista = document.getElementById('listaAvaliarProfissionais');
   if (!lista) return;
   
-  document.getElementById('subTelaEstrelas').style.display = 'none';
+  const subTela = document.getElementById('subTelaEstrelas');
+  if (subTela) subTela.style.display = 'none';
   lista.style.display = 'block';
   lista.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Carregando...</div>';
 
@@ -2080,7 +2085,7 @@ async function carregarTelaAvaliar() {
     const profissionais = [...new Set(servicos.map(s => s.profissional).filter(Boolean))];
     
     if (profissionais.length === 0) {
-      lista.innerHTML = '<div style="text-align:center;padding:40px;">Nenhum profissional</div>';
+      lista.innerHTML = '<div style="text-align:center;padding:40px;">Nenhum profissional encontrado</div>';
       return;
     }
 
@@ -2090,7 +2095,7 @@ async function carregarTelaAvaliar() {
     for (const prof of profissionais) {
       const servicosDoProf = servicos.filter(s => s.profissional === prof);
       
-      // Junta todas as notas (formato [5,4,3] etc)
+      // Junta todas as notas (formato [5,4,3] ou [{"tel":"1199999","nota":5}])
       let todasNotas = [];
       for (const sv of servicosDoProf) {
         if (sv.avaliacoes) {
@@ -2103,17 +2108,22 @@ async function carregarTelaAvaliar() {
         }
       }
       
-      // Calcula média
+      // Converte formato antigo para novo se necessário
+      const notasNumericas = todasNotas.filter(n => typeof n === 'number');
+      const notasObjeto = todasNotas.filter(n => typeof n === 'object' && n !== null);
+      
+      // Calcula média (considera apenas números)
       let mediaHtml = '';
-      if (todasNotas.length > 0) {
-        const soma = todasNotas.reduce((a, b) => a + b, 0);
-        const media = (soma / todasNotas.length).toFixed(1);
-        mediaHtml = `<div style="color:var(--orange);font-size:12px;">⭐ ${media} (${todasNotas.length})</div>`;
+      const todasNotasNumeros = [...notasNumericas, ...notasObjeto.map(n => n.nota)];
+      if (todasNotasNumeros.length > 0) {
+        const soma = todasNotasNumeros.reduce((a, b) => a + b, 0);
+        const media = (soma / todasNotasNumeros.length).toFixed(1);
+        mediaHtml = `<div style="color:var(--orange);font-size:12px;">⭐ ${media} (${todasNotasNumeros.length})</div>`;
       }
       
       // Verifica se usuário já avaliou
-      const jaAvaliou = todasNotas.includes(Number(telefone)) || 
-                        todasNotas.some(n => typeof n === 'object' && n.tel === telefone);
+      const jaAvaliou = notasNumericas.includes(Number(telefone)) || 
+                        notasObjeto.some(n => n.tel === telefone);
       
       html += `
         <div class="profissional-item" onclick="abrirAvaliarProfissional('${prof.replace(/'/g, "\\'")}')">
@@ -2135,6 +2145,7 @@ async function carregarTelaAvaliar() {
     lista.innerHTML = '<div style="text-align:center;padding:40px;color:red;">Erro: ' + e.message + '</div>';
   }
 }
+
 function abrirAvaliarProfissional(profissional) {
   profissionalParaAvaliar = profissional;
   
@@ -2143,17 +2154,29 @@ function abrirAvaliarProfissional(profissional) {
   
   let notaAtual = null;
   for (const sv of servicosDoProf) {
-    try {
-      const notas = JSON.parse(sv.avaliacoes || '[]');
-      const minha = notas.find(n => n === Number(telefone) || (typeof n === 'object' && n.tel === telefone));
-      if (minha) {
-        notaAtual = typeof minha === 'object' ? minha.nota : minha;
-        break;
-      }
-    } catch(e) {}
+    if (sv.avaliacoes) {
+      try {
+        const notas = JSON.parse(sv.avaliacoes);
+        if (Array.isArray(notas)) {
+          // Procura nota do usuário
+          const notaNum = notas.find(n => n === Number(telefone));
+          if (notaNum) {
+            notaAtual = notaNum;
+            break;
+          }
+          const notaObj = notas.find(n => typeof n === 'object' && n !== null && n.tel === telefone);
+          if (notaObj) {
+            notaAtual = notaObj.nota;
+            break;
+          }
+        }
+      } catch(e) {}
+    }
   }
   
-  document.getElementById('avaliarNomeProfissional').textContent = '👨‍💼 ' + profissional;
+  const nomeSpan = document.getElementById('avaliarNomeProfissional');
+  if (nomeSpan) nomeSpan.textContent = '👨‍💼 ' + profissional;
+  
   const estrelas = document.querySelectorAll('.estrela-avaliacao');
   const btn = document.getElementById('btnConfirmarAvaliacao');
   
@@ -2162,32 +2185,39 @@ function abrirAvaliarProfissional(profissional) {
     estrelas.forEach(e => {
       e.style.opacity = parseInt(e.dataset.nota) <= notaAtual ? '1' : '0.3';
     });
-    btn.style.display = 'block';
-    btn.textContent = '✅ Atualizar Avaliação';
+    if (btn) {
+      btn.style.display = 'block';
+      btn.textContent = '✅ Atualizar Avaliação';
+    }
   } else {
     notaSelecionada = null;
     estrelas.forEach(e => e.style.opacity = '0.3');
-    btn.style.display = 'none';
-    btn.textContent = '✅ Confirmar Avaliação';
+    if (btn) btn.style.display = 'none';
   }
   
-  document.getElementById('listaAvaliarProfissionais').style.display = 'none';
-  document.getElementById('subTelaEstrelas').style.display = 'block';
+  const listaDiv = document.getElementById('listaAvaliarProfissionais');
+  const subTela = document.getElementById('subTelaEstrelas');
+  if (listaDiv) listaDiv.style.display = 'none';
+  if (subTela) subTela.style.display = 'block';
 }
 
 async function confirmarAvaliacao() {
   if (!profissionalParaAvaliar || !notaSelecionada) return;
 
   const btn = document.getElementById('btnConfirmarAvaliacao');
-  btn.disabled = true;
-  btn.textContent = 'Salvando...';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
+  }
 
   try {
     const telefone = localStorage.getItem('cliente_telefone');
     if (!telefone) {
       mostrarMensagem('Faça um agendamento primeiro!', 'erro');
-      btn.disabled = false;
-      btn.textContent = '✅ Confirmar Avaliação';
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '✅ Confirmar Avaliação';
+      }
       return;
     }
     const telefoneLimpo = telefone.replace(/\D/g, '');
@@ -2196,9 +2226,13 @@ async function confirmarAvaliacao() {
     
     for (const sv of servicosDoProf) {
       let notas = [];
-      try { notas = JSON.parse(sv.avaliacoes || '[]'); } catch(e) { notas = []; }
+      try { 
+        notas = JSON.parse(sv.avaliacoes || '[]'); 
+      } catch(e) { 
+        notas = []; 
+      }
       
-      // CONVERTE FORMATO ANTIGO (só números) para novo (objeto)
+      // Converte formato antigo (só números) para novo (objeto com tel)
       if (notas.length > 0 && typeof notas[0] === 'number') {
         const antigas = [...notas];
         notas = [];
@@ -2207,7 +2241,8 @@ async function confirmarAvaliacao() {
         }
       }
       
-      const index = notas.findIndex(n => n.tel === telefoneLimpo);
+      // Procura e atualiza ou adiciona
+      const index = notas.findIndex(n => n && n.tel === telefoneLimpo);
       if (index !== -1) {
         notas[index].nota = Number(notaSelecionada);
       } else {
@@ -2225,10 +2260,13 @@ async function confirmarAvaliacao() {
     await carregarTelaAvaliar();
     
   } catch(e) {
+    console.error('Erro:', e);
     mostrarMensagem('Erro: ' + e.message, 'erro');
   } finally {
-    btn.disabled = false;
-    btn.textContent = '✅ Confirmar Avaliação';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '✅ Confirmar Avaliação';
+    }
   }
 }
 // ========== VARIÁVEIS E FUNÇÃO DO MODAL ==========
