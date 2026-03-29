@@ -2336,7 +2336,7 @@ async function confirmarAvaliacao() {
     
   } catch(e) {
     console.error('Erro ao salvar avaliação:', e);
-    mostrarMensagem('Erro ao salvar avaliação', 'erro');
+    mostrarMensagem('Erro: ' + (e?.message || JSON.stringify(e) || 'desconhecido'), 'erro');
   } finally {
     btn.disabled = false;
     btn.textContent = '✅ Confirmar Avaliação';
