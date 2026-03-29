@@ -1299,7 +1299,7 @@ if (temFolgaProfissional) {
         const servicoRef = servicosDoProfissional[0];
         if (servicoRef && servicoRef.avaliacoes) {
           try {
-            const av = JSON.parse(servicoRef.avaliacoes);
+            const av = typeof servicoRef.avaliacoes === "string" ? JSON.parse(servicoRef.avaliacoes) : servicoRef.avaliacoes;
             const media = Array.isArray(av)
               ? (av.length > 0 ? (av.reduce((a,b)=>a+b,0)/av.length).toFixed(1) : null)
               : (av && av.total > 0 ? av.media.toFixed(1) : null);
@@ -1395,7 +1395,7 @@ async function carregarProfissionais() {
         const servicoRef = servicosDoProfissional[0];
         if (servicoRef && servicoRef.avaliacoes) {
           try {
-            const av = JSON.parse(servicoRef.avaliacoes);
+            const av = typeof servicoRef.avaliacoes === "string" ? JSON.parse(servicoRef.avaliacoes) : servicoRef.avaliacoes;
             const media = Array.isArray(av)
               ? (av.length > 0 ? (av.reduce((a,b)=>a+b,0)/av.length).toFixed(1) : null)
               : (av && av.total > 0 ? av.media.toFixed(1) : null);
@@ -2188,7 +2188,7 @@ async function carregarTelaAvaliar() {
       const servicoRef = servicos.find(s => s.profissional === prof);
       if (servicoRef && servicoRef.avaliacoes) {
         try {
-          const av = JSON.parse(servicoRef.avaliacoes);
+          const av = typeof servicoRef.avaliacoes === "string" ? JSON.parse(servicoRef.avaliacoes) : servicoRef.avaliacoes;
           const media = Array.isArray(av)
             ? (av.length > 0 ? (av.reduce((a,b)=>a+b,0)/av.length).toFixed(1) : null)
             : (av && av.total > 0 ? av.media.toFixed(1) : null);
@@ -2314,11 +2314,12 @@ async function confirmarAvaliacao() {
     const novaMedia = parseFloat((somaTotal / totalTotal).toFixed(2));
     
     // Salva em TODOS os serviços do profissional no formato {soma, total, media}
+    // avaliacoes é coluna jsonb no Supabase — manda objeto direto, NÃO string
     for (const servico of servicosDoProf) {
       await fetchSupabase(`servicos?id=eq.${servico.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ 
-          avaliacoes: JSON.stringify({ soma: somaTotal, total: totalTotal, media: novaMedia })
+          avaliacoes: { soma: somaTotal, total: totalTotal, media: novaMedia }
         })
       });
     }
