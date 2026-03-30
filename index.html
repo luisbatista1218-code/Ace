@@ -2269,7 +2269,8 @@ async function confirmarAvaliacao() {
     }
     
     const telefoneLimpo = telefone.replace(/\D/g, '');
-    const ags = await fetchSupabase(`agenda?telefone=eq.${telefoneLimpo}&select=servico_id`);
+    //const ags = await fetchSupabase(`agenda?telefone=eq.${telefoneLimpo}&select=servico_id`);
+    const ags = await fetchSupabase(`agenda?telefone=eq.${telefoneLimpo}&status=eq.concluido&select=servico_id`);
     await carregarServicos();
     
     const profissionaisDoCliente = [];
