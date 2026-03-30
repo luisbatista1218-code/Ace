@@ -1773,6 +1773,11 @@ async function confirmarAgendamento() {
       body: JSON.stringify(agendamentoData)
     });
     
+// Remove a trava de avaliação para este profissional (novo agendamento = pode avaliar de novo)
+let avaliacoesFeitas = JSON.parse(localStorage.getItem('avaliacoes_feitas') || '[]');
+avaliacoesFeitas = avaliacoesFeitas.filter(p => p !== profissionalSelecionado);
+localStorage.setItem('avaliacoes_feitas', JSON.stringify(avaliacoesFeitas));
+
 // manda telegram
 const msg = `AGENDAMENTO\n` +
   `${dataSelecionada} ${horarioSelecionado}\n` +
@@ -2269,8 +2274,7 @@ async function confirmarAvaliacao() {
     }
     
     const telefoneLimpo = telefone.replace(/\D/g, '');
-    //const ags = await fetchSupabase(`agenda?telefone=eq.${telefoneLimpo}&select=servico_id`);
-    const ags = await fetchSupabase(`agenda?telefone=eq.${telefoneLimpo}&status=eq.concluido&select=servico_id`);
+    const ags = await fetchSupabase(`agenda?telefone=eq.${telefoneLimpo}&select=servico_id`);
     await carregarServicos();
     
     const profissionaisDoCliente = [];
@@ -2314,13 +2318,13 @@ async function confirmarAvaliacao() {
     totalTotal += 1;
     const novaMedia = parseFloat((somaTotal / totalTotal).toFixed(2));
     
-    // Salva em TODOS os serviços do profissional no formato {soma, total, media}
-    // avaliacoes é coluna jsonb no Supabase — manda objeto direto, NÃO string
+    // Tenta salvar na tabela servicos (precisa de permissão UPDATE no Supabase)
+    // Se der erro 400/403, verifique o RLS da tabela servicos
     for (const servico of servicosDoProf) {
-      await fetchSupabase(`servicos?id=eq.${servico.id}`, {
+      const res = await fetchSupabase(`servicos?id=eq.${servico.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ 
-          avaliacoes: { soma: somaTotal, total: totalTotal, media: novaMedia }
+          avaliacoes: JSON.stringify({ soma: somaTotal, total: totalTotal, media: novaMedia })
         })
       });
     }
